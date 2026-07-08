@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Eron Pro — Download</title>
+  <style>
+    :root {
+      --bg: #15171b; --panel: #1c1f26; --panel2: #22252e; --border: #2a2e38;
+      --text: #e8eaf0; --muted: #9aa0ad; --accent: #6a6fa6; --accent2: #868cc2;
+      --green: #3fbf6f; --red: #e0625e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.55; }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 40px 20px 60px; }
+
+    /* Cabecalho */
+    .brand { display: flex; align-items: center; gap: 12px; justify-content: center; margin-bottom: 6px; }
+    .brand svg { width: 42px; height: 42px; }
+    .brand h1 { font-size: 30px; letter-spacing: .3px; }
+    .tagline { text-align: center; color: var(--muted); margin-bottom: 34px; font-size: 15px; }
+
+    /* Bloco de download */
+    .dl-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 34px 26px; text-align: center; margin-bottom: 14px; }
+    .btn-dl { display: inline-block; background: var(--accent); color: #fff; text-decoration: none; font-size: 19px; font-weight: 600; padding: 16px 42px; border-radius: 12px; transition: background .15s; }
+    .btn-dl:hover { background: var(--accent2); }
+    .dl-meta { margin-top: 12px; color: var(--muted); font-size: 13px; }
+    .dl-alt { margin-top: 16px; font-size: 13px; }
+    .dl-alt a { color: var(--accent2); }
+    .note-pc { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+
+    /* Passos */
+    h2 { font-size: 20px; margin: 40px 0 16px; }
+    .steps { list-style: none; counter-reset: st; }
+    .steps li { counter-increment: st; display: flex; gap: 14px; align-items: flex-start; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; font-size: 15px; }
+    .steps li::before { content: counter(st); flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+    .steps li > span { flex: 1; }
+    .steps b { color: #fff; }
+
+    /* Aviso do Windows (explicacao) */
+    .warnbox { background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 12px; padding: 16px 18px; margin: 14px 0 22px; font-size: 14.5px; color: var(--muted); }
+    .warnbox b { color: var(--text); }
+
+    /* Maquetes da tela do SmartScreen */
+    .mocks { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    @media (max-width: 720px) { .mocks { grid-template-columns: 1fr; } }
+    .mock-label { text-align: center; font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+    .mock-label b { color: var(--text); }
+    .mock { position: relative; background: #a4262c; border-radius: 10px; padding: 22px 20px 20px; color: #fff; min-height: 240px; box-shadow: 0 10px 30px rgba(0,0,0,.45); overflow: hidden; }
+    .mock .x { position: absolute; top: 10px; right: 10px; background: #fff; color: #111; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 13px; border-radius: 2px; }
+    .mock h3 { font-size: 21px; font-weight: 600; margin-bottom: 12px; }
+    .mock p { font-size: 13px; color: #ffd9d6; margin-bottom: 10px; }
+    .mock .link { display: inline-block; color: #fff; text-decoration: underline; font-size: 13.5px; }
+    .mock .fileinfo { font-size: 13px; color: #ffe9e7; margin: 4px 0; }
+    .mock .btnrow { display: flex; gap: 10px; justify-content: flex-end; margin-top: 26px; }
+    .mock .wbtn { background: #d8d8d8; color: #111; font-size: 13px; padding: 8px 18px; border-radius: 3px; }
+
+    /* Destaque (anel pulsante + numero) */
+    .hl { position: relative; }
+    .hl::after { content: ""; position: absolute; inset: -7px -10px; border: 3px solid #ffd34d; border-radius: 8px; animation: pulse 1.6s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+    .badge { position: absolute; width: 30px; height: 30px; border-radius: 50%; background: #ffd34d; color: #111; font-weight: 800; display: flex; align-items: center; justify-content: center; font-size: 15px; box-shadow: 0 3px 10px rgba(0,0,0,.4); }
+
+    /* Depois de instalar */
+    .after { background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--green); border-radius: 12px; padding: 16px 18px; font-size: 14.5px; }
+    .after b { color: #fff; }
+
+    footer { margin-top: 50px; text-align: center; color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--border); padding-top: 18px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <div class="brand">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+        <rect x="4" y="4" width="56" height="56" rx="14" fill="#6a4fe6"/>
+        <circle cx="24" cy="26" r="7" fill="#fff"/>
+        <circle cx="42" cy="40" r="7" fill="#cfc4ff"/>
+        <path d="M28.5 30.5 37.5 35.5" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+      </svg>
+      <h1>Eron Pro</h1>
+    </div>
+    <p class="tagline">Acesso remoto simples, rapido e seguro.</p>
+
+    <div class="dl-card">
+      <a id="btnSetup" class="btn-dl" href="https://github.com/79237923/aerodesk-releases/releases/latest">&#11015;&#65039; Baixar para Windows</a>
+      <div id="dlMeta" class="dl-meta">Windows 10/11 &middot; instalador</div>
+      <div class="dl-alt">Prefere sem instalar? <a id="btnPortable" href="https://github.com/79237923/aerodesk-releases/releases/latest">Baixe a vers&atilde;o port&aacute;til</a></div>
+      <div class="note-pc">Abra esta p&aacute;gina no computador onde o Eron Pro ser&aacute; usado.</div>
+    </div>
+
+    <h2>Como instalar (leva 1 minuto)</h2>
+    <ol class="steps">
+      <li><span>Clique em <b>Baixar para Windows</b> (bot&atilde;o acima).</span></li>
+      <li><span>Abra o arquivo baixado (<b id="stepFile">AeroDesk-Setup.exe</b>).</span></li>
+      <li><span>O Windows vai mostrar um <b>aviso de seguran&ccedil;a</b> — <b>isso &eacute; normal e esperado</b>. Siga os 2 cliques mostrados abaixo.</span></li>
+      <li><span>Pronto! O Eron Pro instala e abre sozinho.</span></li>
+    </ol>
+
+    <h2>O aviso do Windows (2 cliques e pronto)</h2>
+    <div class="warnbox">
+      <b>Por que esse aviso aparece?</b> O Windows mostra essa tela para <b>todo programa novo</b> de
+      desenvolvedores independentes. Repare que ele diz <i>&ldquo;aplicativo n&atilde;o reconhecido&rdquo;</i> —
+      ou seja, o Windows ainda <b>n&atilde;o conhece</b> o programa. Ele <b>n&atilde;o</b> est&aacute; dizendo que &eacute; um v&iacute;rus.
+      Voc&ecirc; s&oacute; precisa fazer isso <b>uma vez</b>: depois disso, o Eron Pro abre e se atualiza sozinho, sem avisos.
+    </div>
+
+    <div class="mocks">
+      <div>
+        <div class="mock-label"><b>1&ordm; clique:</b> em &ldquo;Mais informa&ccedil;&otilde;es&rdquo;</div>
+        <div class="mock">
+          <div class="x">&#10005;</div>
+          <h3>O Windows protegeu o computador</h3>
+          <p>O Microsoft Defender SmartScreen impediu que um aplicativo n&atilde;o reconhecido fosse iniciado. A execu&ccedil;&atilde;o deste aplicativo pode colocar o computador em risco.</p>
+          <span class="link hl">Mais informa&ccedil;&otilde;es<span class="badge" style="top:-14px; right:-40px;">1</span></span>
+        </div>
+      </div>
+      <div>
+        <div class="mock-label"><b>2&ordm; clique:</b> em &ldquo;Executar assim mesmo&rdquo;</div>
+        <div class="mock">
+          <div class="x">&#10005;</div>
+          <h3>O Windows protegeu o computador</h3>
+          <div class="fileinfo">Aplicativo: <span id="mockFile">AeroDesk-Setup.exe</span></div>
+          <div class="fileinfo">Fornecedor: Fornecedor desconhecido</div>
+          <div class="btnrow">
+            <span class="wbtn hl">Executar assim mesmo<span class="badge" style="top:-16px; left:-16px;">2</span></span>
+            <span class="wbtn">N&atilde;o executar</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h2>Depois de instalar</h2>
+    <div class="after">
+      Abra o Eron Pro e <b>me envie o ID de 9 d&iacute;gitos</b> que aparece no topo do programa
+      (&#9776; &rarr; Op&ccedil;&otilde;es &rarr; Assinatura tamb&eacute;m mostra). Com ele eu <b>ativo a sua assinatura</b>
+      e te mando a chave de ativa&ccedil;&atilde;o — voc&ecirc; cola uma &uacute;nica vez e est&aacute; pronto para usar.
+    </div>
+
+    <footer>RRS Software &middot; Todos os direitos reservados &middot; <span id="footVer"></span></footer>
+  </div>
+
+  <script>
+    // Busca a versao mais nova no GitHub e aponta os botoes direto pro arquivo.
+    // Se a busca falhar, os links ja apontam pra pagina de releases (fallback).
+    fetch('https://api.github.com/repos/79237923/aerodesk-releases/releases/latest')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var v = (d.tag_name || '').replace(/^v/, '');
+        var assets = d.assets || [];
+        var setup = null, portable = null;
+        for (var i = 0; i < assets.length; i++) {
+          if (/^AeroDesk-Setup-.*\.exe$/.test(assets[i].name)) setup = assets[i];
+          if (/^AeroDesk-Portable-.*\.exe$/.test(assets[i].name)) portable = assets[i];
+        }
+        if (setup) {
+          document.getElementById('btnSetup').href = setup.browser_download_url;
+          document.getElementById('stepFile').textContent = setup.name;
+          document.getElementById('mockFile').textContent = setup.name;
+          var mb = Math.round(setup.size / 1048576);
+          document.getElementById('dlMeta').textContent = 'Windows 10/11 · versão ' + v + ' · ' + mb + ' MB';
+        }
+        if (portable) document.getElementById('btnPortable').href = portable.browser_download_url;
+        if (v) document.getElementById('footVer').textContent = 'v' + v;
+      })
+      .catch(function () { /* fallback: links pra pagina de releases */ });
+  </script>
+</body>
+</html>
