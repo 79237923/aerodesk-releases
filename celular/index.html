@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#15171b">
+<title>AeroDesk — Celular</title>
+<style>
+  :root{ --bg:#15171b; --panel:#1e2128; --panel2:#262a32; --border:#323844; --text:#e7e9ee; --muted:#949aa5; --accent:#6a6fa6; --accent2:#868cc2; --green:#46d17a; --red:#e0625e; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; margin:0; overscroll-behavior:none; background:var(--bg); color:var(--text); font-family:Segoe UI,-apple-system,Roboto,Arial,sans-serif; }
+  body{ display:flex; flex-direction:column; }
+  /* ---------- Tela de conexao ---------- */
+  #setup{ padding:18px 16px 30px; max-width:520px; margin:0 auto; width:100%; overflow:auto; }
+  .brand{ display:flex; align-items:center; gap:10px; font-weight:800; font-size:20px; margin:6px 0 2px; }
+  .brand .dot{ width:12px;height:12px;border-radius:50%;background:var(--accent2); box-shadow:0 0 0 4px rgba(134,140,194,.18); }
+  .sub{ color:var(--muted); font-size:13px; margin:0 0 16px; }
+  label{ display:block; font-size:12px; color:var(--muted); margin:14px 0 5px; }
+  input,select{ width:100%; padding:13px 12px; border-radius:11px; border:1px solid var(--border); background:#14161a; color:#fff; font-size:16px; }
+  input:focus,select:focus{ outline:none; border-color:var(--accent); }
+  .btn{ width:100%; margin-top:16px; padding:15px; border:0; border-radius:12px; background:var(--accent); color:#fff; font-size:16px; font-weight:700; cursor:pointer; }
+  .btn:active{ background:var(--accent2); }
+  .btn.sec{ background:var(--panel2); }
+  .btn:disabled{ opacity:.5; }
+  .row2{ display:flex; gap:10px; }
+  .row2>*{ flex:1; }
+  .favs{ margin-top:18px; }
+  .fav{ display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:9px; }
+  .fav .fi{ flex:1; min-width:0; }
+  .fav .fn{ font-weight:700; font-size:15px; }
+  .fav .fd{ color:var(--muted); font-size:12px; font-family:monospace; }
+  .fav .go{ background:var(--accent); color:#fff; border:0; border-radius:9px; padding:9px 14px; font-weight:700; font-size:14px; }
+  .fav .del{ background:transparent; border:0; color:var(--muted); font-size:20px; padding:4px 6px; }
+  .err{ color:var(--red); font-size:13px; margin-top:10px; min-height:18px; }
+  .hint{ background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px 14px; font-size:13px; color:var(--muted); margin-top:14px; line-height:1.5; }
+  details{ margin-top:16px; border-top:1px solid var(--border); padding-top:6px; }
+  summary{ color:var(--muted); font-size:13px; padding:8px 0; cursor:pointer; }
+  textarea{ width:100%; height:80px; padding:10px; border-radius:10px; border:1px solid var(--border); background:#14161a; color:var(--accent2); font-family:monospace; font-size:11px; }
+  /* ---------- Tela do viewer ---------- */
+  #viewer{ position:fixed; inset:0; background:#000; display:none; flex-direction:column; }
+  #screen{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; touch-action:none; background:#000; }
+  #topbar{ position:absolute; top:0; left:0; right:0; display:flex; align-items:center; gap:6px; padding:calc(env(safe-area-inset-top) + 6px) 8px 6px; background:linear-gradient(#000a,#0000); z-index:5; transition:opacity .25s; }
+  #topbar.hide{ opacity:0; pointer-events:none; }
+  #topbar .sp{ flex:1; }
+  .tb{ background:#ffffff1c; border:0; color:#fff; border-radius:9px; padding:9px 11px; font-size:14px; font-weight:600; }
+  .tb:active{ background:#ffffff33; }
+  .tb.red:active{ background:var(--red); }
+  #vstatus{ position:absolute; top:50%; left:0; right:0; transform:translateY(-50%); text-align:center; color:#cfd3df; font-size:15px; padding:0 20px; z-index:4; }
+  /* Barra de teclas especiais */
+  #keysbar{ position:absolute; left:0; right:0; bottom:0; display:none; gap:5px; padding:7px 6px calc(env(safe-area-inset-bottom) + 7px); background:#0d0f13ee; z-index:6; overflow-x:auto; }
+  #keysbar.on{ display:flex; }
+  .kb{ flex:0 0 auto; background:#262a32; border:1px solid var(--border); color:#e7e9ee; border-radius:8px; padding:11px 12px; font-size:14px; font-weight:600; }
+  .kb:active{ background:var(--accent); }
+  .kb.act{ background:var(--accent); }
+  #kbInput{ position:absolute; left:-2000px; top:0; opacity:0; height:1px; width:1px; }
+</style>
+</head>
+<body>
+
+<!-- ================= TELA DE CONEXAO ================= -->
+<div id="setup">
+  <div class="brand"><span class="dot"></span> AeroDesk <span style="font-size:13px;color:var(--muted);font-weight:600">no celular</span></div>
+  <p class="sub">Acesse seus PCs de qualquer lugar. Digite o ID do PC e a senha.</p>
+
+  <div id="needLic" class="hint" style="display:none">
+    <b style="color:var(--text)">Primeiro acesso:</b> cole sua <b>chave de assinatura</b> em “Configurações” (embaixo) uma vez. Depois é só conectar.
+  </div>
+
+  <label>ID do PC</label>
+  <input id="tid" inputmode="numeric" autocomplete="off" placeholder="ex: 386 386 665">
+  <label>Senha do PC</label>
+  <input id="tpass" type="text" autocomplete="off" placeholder="senha desse PC">
+  <div class="row2">
+    <button class="btn" id="btnConnect">Conectar</button>
+    <button class="btn sec" id="btnSaveFav" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px">☆ Salvar</button>
+  </div>
+  <div class="err" id="err"></div>
+
+  <div class="favs" id="favs"></div>
+
+  <details id="cfg">
+    <summary>⚙️ Configurações (chave, qualidade, servidor)</summary>
+    <label>Chave de assinatura (cole 1 vez — fica salva só neste celular)</label>
+    <textarea id="lic" placeholder="cole aqui a chave que o AeroDesk te passou"></textarea>
+    <div id="licinfo" class="sub" style="margin-top:4px"></div>
+    <label>Qualidade do vídeo</label>
+    <select id="qual">
+      <option value="fluido">Fluida (540p) — leve, boa p/ internet do celular</option>
+      <option value="equilibrado">Equilibrada (720p)</option>
+      <option value="nitido">Nítida (resolução cheia) — pesada</option>
+    </select>
+    <label>Endereço do servidor</label>
+    <input id="srv" type="text" placeholder="wss://...">
+    <button class="btn sec" id="btnSaveCfg">Salvar configurações</button>
+  </details>
+
+  <div class="hint" style="margin-top:20px">
+    Dica: toque <b>= clique</b> · segurar <b>= clique direito</b> · arrastar <b>= mover/arrastar</b> · dois dedos <b>= rolar</b>. Use o botão <b>⌨</b> pro teclado.
+  </div>
+</div>
+
+<!-- ================= TELA DO VIEWER ================= -->
+<div id="viewer">
+  <canvas id="screen"></canvas>
+  <div id="vstatus">Conectando...</div>
+  <div id="topbar">
+    <button class="tb red" id="btnHang">✕ Sair</button>
+    <div class="sp"></div>
+    <button class="tb" id="btnKb">⌨ Teclado</button>
+    <button class="tb" id="btnSpecial">⋯ Teclas</button>
+    <button class="tb" id="btnHideBar">▲</button>
+  </div>
+  <div id="keysbar">
+    <button class="kb" data-k="Escape">Esc</button>
+    <button class="kb" data-k="Tab">Tab</button>
+    <button class="kb act-toggle" data-mod="Control">Ctrl</button>
+    <button class="kb act-toggle" data-mod="Alt">Alt</button>
+    <button class="kb act-toggle" data-mod="Meta">⊞</button>
+    <button class="kb" data-combo="Control,KeyC">Ctrl+C</button>
+    <button class="kb" data-combo="Control,KeyV">Ctrl+V</button>
+    <button class="kb" data-k="ArrowLeft">←</button>
+    <button class="kb" data-k="ArrowUp">↑</button>
+    <button class="kb" data-k="ArrowDown">↓</button>
+    <button class="kb" data-k="ArrowRight">→</button>
+    <button class="kb" data-k="Backspace">⌫</button>
+    <button class="kb" data-k="Enter">↵</button>
+  </div>
+  <input id="kbInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+  <audio id="aud" autoplay playsinline></audio>
+</div>
+
+<script>
+(function(){
+'use strict';
+var $=function(i){return document.getElementById(i);};
+var DEF_SERVER='wss://aerodesk-server.onrender.com';
+var ICE=[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun.cloudflare.com:3478'}];
+
+// ---------- config guardada no celular ----------
+function get(k,d){ try{var v=localStorage.getItem(k); return v===null?d:v;}catch(e){return d;} }
+function set(k,v){ try{localStorage.setItem(k,v);}catch(e){} }
+function favsGet(){ try{return JSON.parse(get('m_favs','[]'))||[];}catch(e){return [];} }
+function favsSet(a){ set('m_favs',JSON.stringify(a)); }
+var SERVER=get('m_server',DEF_SERVER);
+var LICENSE=get('m_license','');
+var QUALITY=get('m_quality','fluido');
+var MYID='';
+
+// ---------- utils de licenca (extrai o ID de dentro da chave) ----------
+function b64urlDecode(s){ s=String(s||'').replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; try{return decodeURIComponent(escape(atob(s)));}catch(e){try{return atob(s);}catch(e2){return '';}} }
+function idFromToken(tok){ try{ var p=String(tok).split('.')[0]; var j=JSON.parse(b64urlDecode(p)); return String(j.id||''); }catch(e){ return ''; } }
+function licInfo(tok){ try{ var p=String(tok).split('.')[0]; var j=JSON.parse(b64urlDecode(p)); return 'Chave de: '+(j.name||'—')+' · ID '+j.id; }catch(e){ return tok?'chave invalida':''; } }
+
+// ---------- preencher a tela de conexao ----------
+function renderFavs(){
+  var f=favsGet(), el=$('favs'); el.innerHTML='';
+  f.forEach(function(x,idx){
+    var d=document.createElement('div'); d.className='fav';
+    d.innerHTML='<div class="fi"><div class="fn"></div><div class="fd"></div></div>'+
+      '<button class="go">▶</button><button class="del">×</button>';
+    d.querySelector('.fn').textContent=x.name||('PC '+x.id);
+    d.querySelector('.fd').textContent=x.id;
+    d.querySelector('.go').onclick=function(){ $('tid').value=x.id; $('tpass').value=x.pass||''; doConnect(); };
+    d.querySelector('.del').onclick=function(){ var a=favsGet(); a.splice(idx,1); favsSet(a); renderFavs(); };
+    el.appendChild(d);
+  });
+}
+function refreshCfg(){
+  $('lic').value=LICENSE; $('srv').value=SERVER; $('qual').value=QUALITY;
+  $('licinfo').textContent=licInfo(LICENSE);
+  $('needLic').style.display=LICENSE?'none':'block';
+  MYID=idFromToken(LICENSE);
+}
+$('btnSaveCfg').onclick=function(){
+  LICENSE=$('lic').value.trim(); SERVER=($('srv').value.trim()||DEF_SERVER); QUALITY=$('qual').value;
+  set('m_license',LICENSE); set('m_server',SERVER); set('m_quality',QUALITY);
+  refreshCfg(); $('err').textContent='Configurações salvas.'; $('err').style.color='var(--green)';
+};
+$('lic').addEventListener('input',function(){ $('licinfo').textContent=licInfo($('lic').value.trim()); });
+$('btnSaveFav').onclick=function(){
+  var id=$('tid').value.replace(/\D/g,''); if(!id){ showErr('Digite o ID pra salvar.'); return; }
+  var a=favsGet(); a=a.filter(function(x){return x.id!==id;});
+  a.unshift({id:id, pass:$('tpass').value, name:prompt('Nome pra este PC:', 'PC '+id)||('PC '+id)});
+  favsSet(a); renderFavs(); showErr('');
+};
+$('btnConnect').onclick=doConnect;
+function showErr(m,ok){ var e=$('err'); e.textContent=m||''; e.style.color=ok?'var(--green)':'var(--red)'; }
+
+// ================= CONEXAO / WEBRTC =================
+var ws=null,pc=null,controlCh=null,videoCh=null,pending=[],hbTimer=null,connected=false;
+var target='',password='';
+
+function doConnect(){
+  target=$('tid').value.replace(/\D/g,''); password=$('tpass').value;
+  if(!target){ showErr('Digite o ID do PC.'); return; }
+  if(!LICENSE){ showErr('Cole sua chave em Configurações primeiro.'); $('cfg').open=true; return; }
+  MYID=idFromToken(LICENSE); if(!MYID){ showErr('Chave inválida. Cole a chave certa em Configurações.'); return; }
+  showErr('');
+  showViewer(); vstatus('Conectando ao servidor...');
+  cleanup(true);
+  try{ ws=new WebSocket(SERVER); }catch(e){ vstatus('Falha ao abrir o servidor.'); return; }
+  ws.onopen=function(){ vstatus('Conectando ao PC '+target+'...'); wsend({type:'connect', target:target, password:password, license:LICENSE, fromId:MYID}); };
+  ws.onmessage=function(ev){ var m; try{m=JSON.parse(ev.data);}catch(e){return;} onSig(m); };
+  ws.onerror=function(){};
+  ws.onclose=function(){ if(connected){ vstatus('Conexão com o servidor caiu.'); } };
+  // "destrava" o audio no gesto do usuario (iOS)
+  try{ var a=$('aud'); a.muted=true; a.play().then(function(){a.muted=false;}).catch(function(){}); }catch(e){}
+}
+function wsend(o){ try{ if(ws&&ws.readyState===1) ws.send(JSON.stringify(o)); }catch(e){} }
+
+function onSig(m){
+  if(m.type==='connected-to-host'){ vstatus('Conectado. Recebendo a tela...'); }
+  else if(m.type==='signal'){ handleSignal(m.data); }
+  else if(m.type==='rejected'){ vstatus('Recusado: '+(m.reason||'senha?')); setTimeout(hangup,1500); }
+  else if(m.type==='license-problem'){ vstatus('Assinatura: '+(m.reason||'')+'. Confira a chave.'); setTimeout(hangup,2500); }
+  else if(m.type==='error'){ vstatus('Erro: '+(m.message||'')); if(/nao encontrado|encontrado/i.test(m.message||'')){ setTimeout(hangup,2200); } }
+  else if(m.type==='peer-left'){ vstatus('O PC encerrou a conexão.'); setTimeout(hangup,1500); }
+  else if(m.type==='be-secondary'){ /* host ocupado: entra como 2a pessoa */ wsend({type:'connect', target:target, password:password, license:LICENSE, fromId:MYID, sessionId:m.sessionId}); }
+}
+
+function newPc(){
+  pc=new RTCPeerConnection({iceServers:ICE});
+  pc.onicecandidate=function(e){ if(e.candidate) wsend({type:'signal', data:{candidate:e.candidate}}); };
+  pc.onconnectionstatechange=function(){ if(pc&&(pc.connectionState==='failed'||pc.connectionState==='disconnected')){ vstatus('Conexão instável...'); } };
+  pc.ondatachannel=function(e){ var ch=e.channel; if(ch.label==='aerodesk-video') setupVideo(ch); else if(ch.label==='aerodesk') setupControl(ch); /* 'aerodesk-file' ignorado */ };
+  pc.ontrack=function(e){ try{ var a=$('aud'); a.srcObject=e.streams[0]; a.muted=false; a.play().catch(function(){}); }catch(err){} };
+}
+async function handleSignal(data){
+  if(!pc) newPc();
+  if(data.sdp){
+    try{ await pc.setRemoteDescription(data.sdp); }catch(e){ return; }
+    for(var i=0;i<pending.length;i++){ try{ await pc.addIceCandidate(pending[i]); }catch(e){} } pending=[];
+    if(data.sdp.type==='offer'){ var ans=await pc.createAnswer(); await pc.setLocalDescription(ans); wsend({type:'signal', data:{sdp:pc.localDescription}}); }
+  } else if(data.candidate){
+    if(pc.remoteDescription&&pc.remoteDescription.type){ try{ await pc.addIceCandidate(data.candidate); }catch(e){} }
+    else pending.push(data.candidate);
+  }
+}
+
+function setupControl(ch){
+  controlCh=ch;
+  ch.onopen=function(){
+    connected=true; vstatus(''); $('vstatus').style.display='none';
+    sendInput({type:'hello', build:'mobile'});
+    sendInput({type:'quality', mode:QUALITY});
+    sendInput({type:'cursor-mode', drawCursor:true, watch:false}); // mostra o ponteiro DENTRO do video (bom pro toque)
+    if(hbTimer) clearInterval(hbTimer);
+    hbTimer=setInterval(function(){ sendInput({type:'mouse-state', buttons:heldButtons}); }, 150);
+    keepAwake();
+  };
+  ch.onmessage=function(){};
+  ch.onclose=function(){};
+}
+function sendInput(o){ if(controlCh&&controlCh.readyState==='open'){ try{ controlCh.send(JSON.stringify(o)); }catch(e){} } }
+
+// ================= VIDEO (WebCodecs) — mesmo protocolo do PC =================
+var canvas=$('screen'), cctx=canvas.getContext('2d');
+var vdecoder=null,vconfigured=false,vbuf=new Uint8Array(0),vts=0;
+var frameQueue=[],vRaf=0,vPlaying=false,vClock0=0,vTs0=0;
+var V_START=4, V_MAX=10;   // represa (jitter buffer) em quadros ~ até ~80-160ms
+function vConcat(a,b){ var n=new Uint8Array(a.length+b.length); n.set(a); n.set(b,a.length); return n; }
+function vAudPositions(b){ var p=[]; for(var i=0;i+3<b.length;i++){ if(b[i]===0&&b[i+1]===0&&b[i+2]===1&&(b[i+3]&0x1f)===9){ p.push(i); i+=2; } } return p; }
+function vEachNal(au,cb){ for(var i=0;i+3<au.length;i++){ if(au[i]===0&&au[i+1]===0&&au[i+2]===1){ cb(i+3); i+=2; } } }
+function vIsKey(au){ var k=false; vEachNal(au,function(s){ var t=au[s]&0x1f; if(t===5||t===7)k=true; }); return k; }
+function vCodecFromAU(au){ var c=null; vEachNal(au,function(s){ if((au[s]&0x1f)===7&&au[s+3]!==undefined){ var h=function(n){return n.toString(16).padStart(2,'0');}; c='avc1.'+h(au[s+1])+h(au[s+2])+h(au[s+3]); } }); return c; }
+function vEnsureDecoder(){
+  vdecoder=new VideoDecoder({
+    output:function(frame){ frameQueue.push(frame); if(frameQueue.length>V_MAX+12){ var f=frameQueue.shift(); try{f.close();}catch(e){} } },
+    error:function(e){ vResetDecoder(); }
+  });
+}
+function vResetDecoder(){ try{ if(vdecoder&&vdecoder.state!=='closed')vdecoder.close(); }catch(e){} vdecoder=null;vconfigured=false;vbuf=new Uint8Array(0);vts=0; for(var i=0;i<frameQueue.length;i++){try{frameQueue[i].close();}catch(e){}} frameQueue=[]; vPlaying=false; }
+function onVideoBytes(u8){
+  vbuf=vConcat(vbuf,u8);
+  var pos=vAudPositions(vbuf); if(pos.length<2) return;
+  for(var k=0;k<pos.length-1;k++){
+    var au=vbuf.slice(pos[k],pos[k+1]); var key=vIsKey(au);
+    if(!vconfigured){
+      if(!key) continue;
+      if(!vdecoder) vEnsureDecoder();
+      var codec=vCodecFromAU(au)||'avc1.640028';
+      try{ vdecoder.configure({codec:codec, optimizeForLatency:true}); vconfigured=true; }catch(e){ return; }
+    }
+    try{ if(vdecoder&&vdecoder.state==='configured'){ vdecoder.decode(new EncodedVideoChunk({type:key?'key':'delta', timestamp:vts, data:au})); vts+=16666; } }catch(e){}
+  }
+  vbuf=vbuf.slice(pos[pos.length-1]);
+}
+function vDrawLoop(){
+  vRaf=requestAnimationFrame(vDrawLoop);
+  if(!vPlaying){ if(frameQueue.length>=V_START){ vPlaying=true; vClock0=performance.now(); vTs0=frameQueue[0].timestamp; } else return; }
+  var now=performance.now(), toDraw=null;
+  while(frameQueue.length && (vClock0+(frameQueue[0].timestamp-vTs0)/1000)<=now){ if(toDraw){try{toDraw.close();}catch(e){}} toDraw=frameQueue.shift(); }
+  while(frameQueue.length>V_MAX){ var f=frameQueue.shift(); try{f.close();}catch(e){} vClock0=0; }
+  if(vClock0===0&&frameQueue.length){ vClock0=now; vTs0=frameQueue[0].timestamp; }
+  if(toDraw){ if(canvas.width!==toDraw.displayWidth){ canvas.width=toDraw.displayWidth; canvas.height=toDraw.displayHeight; } try{ cctx.drawImage(toDraw,0,0); }catch(e){} try{ toDraw.close(); }catch(e){} }
+  if(frameQueue.length===0) vPlaying=false;
+}
+function setupVideo(ch){
+  videoCh=ch; ch.binaryType='arraybuffer';
+  vResetDecoder(); if(!vRaf) vDrawLoop();
+  ch.onmessage=function(ev){ onVideoBytes(new Uint8Array(ev.data)); };
+}
+
+// ================= CONTROLE POR TOQUE =================
+var heldButtons=0, lastMove=0;
+function norm(cx,cy){
+  var r=canvas.getBoundingClientRect(), vw=canvas.width, vh=canvas.height;
+  if(!vw||!vh||!r.width||!r.height) return null;
+  var elA=r.width/r.height, vA=vw/vh, cw,chh,ox,oy;
+  if(elA>vA){ chh=r.height; cw=r.height*vA; ox=(r.width-cw)/2; oy=0; } else { cw=r.width; chh=r.width/vA; ox=0; oy=(r.height-chh)/2; }
+  var x=(cx-r.left-ox)/cw, y=(cy-r.top-oy)/chh;
+  if(x<0||x>1||y<0||y>1) return null;
+  return {x:x,y:y};
+}
+var tStart=null,tMoved=false,dragging=false,longTimer=null,twoPrevY=0,twoMode=false;
+canvas.addEventListener('touchstart',function(e){
+  e.preventDefault();
+  if(e.touches.length===1){
+    var t=e.touches[0], n=norm(t.clientX,t.clientY);
+    tStart={cx:t.clientX,cy:t.clientY,n:n,time:Date.now()}; tMoved=false; dragging=false; twoMode=false;
+    if(n) sendInput({type:'mouse-move', x:n.x, y:n.y, buttons:0});
+    clearTimeout(longTimer);
+    longTimer=setTimeout(function(){ // segurar = clique direito
+      if(!tMoved && tStart && tStart.n){ sendInput({type:'mouse-down',button:2,x:tStart.n.x,y:tStart.n.y}); sendInput({type:'mouse-up',button:2,x:tStart.n.x,y:tStart.n.y}); tStart=null; navigator.vibrate&&navigator.vibrate(15); }
+    },520);
+  } else if(e.touches.length===2){ twoMode=true; dragging=false; clearTimeout(longTimer); twoPrevY=(e.touches[0].clientY+e.touches[1].clientY)/2; }
+},{passive:false});
+canvas.addEventListener('touchmove',function(e){
+  e.preventDefault();
+  if(twoMode && e.touches.length>=2){ // dois dedos = rolar
+    var y=(e.touches[0].clientY+e.touches[1].clientY)/2, d=twoPrevY-y;
+    if(Math.abs(d)>3){ sendInput({type:'wheel', dy:d*2.2, x:0.5, y:0.5}); twoPrevY=y; }
+    return;
+  }
+  if(e.touches.length===1 && tStart){
+    var t=e.touches[0], n=norm(t.clientX,t.clientY);
+    var dx=t.clientX-tStart.cx, dy=t.clientY-tStart.cy;
+    if(!tMoved && (dx*dx+dy*dy)>90){ tMoved=true; clearTimeout(longTimer); dragging=true; heldButtons=1; if(tStart.n) sendInput({type:'mouse-down',button:0,x:tStart.n.x,y:tStart.n.y}); }
+    if(dragging && n){ var now=performance.now(); if(now-lastMove>16){ lastMove=now; sendInput({type:'mouse-move', x:n.x, y:n.y, buttons:1}); } }
+  }
+},{passive:false});
+canvas.addEventListener('touchend',function(e){
+  e.preventDefault(); clearTimeout(longTimer);
+  if(twoMode){ if(e.touches.length===0) twoMode=false; return; }
+  if(tStart){
+    if(dragging){ sendInput({type:'mouse-up', button:0}); heldButtons=0; dragging=false; }
+    else if(!tMoved && tStart.n){ // toque = clique esquerdo
+      sendInput({type:'mouse-down',button:0,x:tStart.n.x,y:tStart.n.y}); sendInput({type:'mouse-up',button:0,x:tStart.n.x,y:tStart.n.y});
+    }
+  }
+  tStart=null; tMoved=false;
+},{passive:false});
+
+// ================= TECLADO =================
+var kb=$('kbInput'), kbLast='';
+$('btnKb').onclick=function(){ try{ kb.value=''; kbLast=''; kb.focus(); }catch(e){} };
+kb.addEventListener('input',function(){
+  var v=kb.value, i=0; while(i<kbLast.length && i<v.length && kbLast[i]===v[i]) i++;
+  var removed=kbLast.length-i, added=v.slice(i);
+  for(var r=0;r<removed;r++){ tapKey('Backspace','Backspace'); }
+  if(added){ sendInput({type:'text', text:added}); }
+  kbLast=v; if(v.length>300){ kb.value=''; kbLast=''; }
+});
+kb.addEventListener('keydown',function(e){
+  if(e.key==='Enter'){ tapKey('Enter','Enter'); e.preventDefault(); }
+  else if(e.key==='Backspace' && kb.value===''){ tapKey('Backspace','Backspace'); e.preventDefault(); }
+});
+function tapKey(code,key){ sendInput({type:'key-down',code:code,key:key||code}); sendInput({type:'key-up',code:code,key:key||code}); }
+
+// barra de teclas especiais
+var activeMods={};
+$('btnSpecial').onclick=function(){ $('keysbar').classList.toggle('on'); };
+Array.prototype.forEach.call(document.querySelectorAll('#keysbar .kb'),function(b){
+  b.addEventListener('click',function(){
+    if(b.dataset.mod){ // modificador: liga/desliga (aplica na proxima tecla/combo)
+      var m=b.dataset.mod; activeMods[m]=!activeMods[m]; b.classList.toggle('act',activeMods[m]); return;
+    }
+    if(b.dataset.combo){ var parts=b.dataset.combo.split(','); comboKeys(parts); return; }
+    if(b.dataset.k){ // tecla simples, com os modificadores ligados (se houver)
+      var mods=Object.keys(activeMods).filter(function(m){return activeMods[m];});
+      if(mods.length){ comboKeys(mods.map(codeForMod).concat([b.dataset.k])); clearMods(); }
+      else tapKey(b.dataset.k, keyForCode(b.dataset.k));
+    }
+  });
+});
+function codeForMod(m){ return m==='Control'?'ControlLeft':m==='Alt'?'AltLeft':m==='Meta'?'MetaLeft':'ShiftLeft'; }
+function keyForCode(c){ var map={Enter:'Enter',Backspace:'Backspace',Tab:'Tab',Escape:'Escape',ArrowLeft:'ArrowLeft',ArrowRight:'ArrowRight',ArrowUp:'ArrowUp',ArrowDown:'ArrowDown'}; return map[c]||c; }
+function clearMods(){ activeMods={}; Array.prototype.forEach.call(document.querySelectorAll('#keysbar .act-toggle'),function(b){b.classList.remove('act');}); }
+function comboKeys(codes){ // segura todos, solta na ordem inversa
+  for(var i=0;i<codes.length;i++) sendInput({type:'key-down',code:codes[i],key:keyForCode(codes[i])});
+  for(var j=codes.length-1;j>=0;j--) sendInput({type:'key-up',code:codes[j],key:keyForCode(codes[j])});
+}
+
+// ================= barra / status / sair =================
+function vstatus(t){ var e=$('vstatus'); e.textContent=t; e.style.display=t?'block':'none'; }
+$('btnHideBar').onclick=function(){ $('topbar').classList.toggle('hide'); };
+$('btnHang').onclick=hangup;
+function showViewer(){ $('setup').style.display='none'; $('viewer').style.display='flex'; }
+function showSetup(){ $('viewer').style.display='none'; $('setup').style.display='block'; }
+function cleanup(keepScreen){
+  connected=false;
+  try{ if(hbTimer){clearInterval(hbTimer); hbTimer=null;} }catch(e){}
+  try{ if(controlCh) controlCh.close(); }catch(e){} controlCh=null;
+  try{ if(videoCh) videoCh.close(); }catch(e){} videoCh=null;
+  try{ if(pc) pc.close(); }catch(e){} pc=null; pending=[];
+  try{ if(ws){ ws.onclose=null; ws.close(); } }catch(e){} ws=null;
+  vResetDecoder(); if(!keepScreen){ if(vRaf){cancelAnimationFrame(vRaf); vRaf=0;} }
+  try{ cctx.clearRect(0,0,canvas.width,canvas.height); }catch(e){}
+  try{ var a=$('aud'); a.srcObject=null; }catch(e){}
+  heldButtons=0; clearMods();
+}
+function hangup(){ try{ wsend({type:'hangup'}); }catch(e){} cleanup(false); releaseAwake(); $('keysbar').classList.remove('on'); showSetup(); }
+
+// ---------- manter a tela ligada ----------
+var wakeLock=null;
+async function keepAwake(){ try{ if('wakeLock' in navigator){ wakeLock=await navigator.wakeLock.request('screen'); } }catch(e){} }
+function releaseAwake(){ try{ if(wakeLock){ wakeLock.release(); wakeLock=null; } }catch(e){} }
+document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible' && connected) keepAwake(); });
+
+// ---------- aviso se o navegador nao tiver WebCodecs ----------
+if(typeof VideoDecoder==='undefined'){
+  $('needLic').style.display='block';
+  $('needLic').innerHTML='<b style="color:var(--red)">Atenção:</b> este navegador não suporta vídeo (WebCodecs). No iPhone use o <b>Safari atualizado (iOS 16.4+)</b>; no Android use o <b>Chrome</b>.';
+}
+
+// ---------- iniciar ----------
+refreshCfg(); renderFavs();
+})();
+</script>
+</body>
+</html>
