@@ -49,6 +49,8 @@
   .tb:active{ background:#ffffff33; }
   .tb.red:active{ background:var(--red); }
   #vstatus{ position:absolute; top:50%; left:0; right:0; transform:translateY(-50%); text-align:center; color:#cfd3df; font-size:15px; padding:0 20px; z-index:4; }
+  #dbg{ position:absolute; left:6px; right:6px; top:calc(env(safe-area-inset-top) + 50px); z-index:7; font:11px/1.5 monospace; color:#9f9; background:#000c; padding:7px 9px; border-radius:8px; white-space:pre-wrap; display:none; }
+  #dbg.on{ display:block; }
   /* Barra de teclas especiais */
   #keysbar{ position:absolute; left:0; right:0; bottom:0; display:none; gap:5px; padding:7px 6px calc(env(safe-area-inset-bottom) + 7px); background:#0d0f13ee; z-index:6; overflow-x:auto; }
   #keysbar.on{ display:flex; }
@@ -106,6 +108,7 @@
 <div id="viewer">
   <canvas id="screen"></canvas>
   <div id="vstatus">Conectando...</div>
+  <div id="dbg"></div>
   <div id="topbar">
     <button class="tb red" id="btnHang">✕ Sair</button>
     <div class="sp"></div>
@@ -261,6 +264,7 @@ var canvas=$('screen'), cctx=canvas.getContext('2d');
 var vdecoder=null,vconfigured=false,vbuf=new Uint8Array(0),vts=0;
 var frameQueue=[],vRaf=0,vPlaying=false,vClock0=0,vTs0=0;
 var V_START=4, V_MAX=10;   // represa (jitter buffer) em quadros ~ até ~80-160ms
+var vBytes=0,vFrames=0,vErr='',vCfg='',vDbgTimer=null; // diagnostico (tela preta)
 function vConcat(a,b){ var n=new Uint8Array(a.length+b.length); n.set(a); n.set(b,a.length); return n; }
 function vAudPositions(b){ var p=[]; for(var i=0;i+3<b.length;i++){ if(b[i]===0&&b[i+1]===0&&b[i+2]===1&&(b[i+3]&0x1f)===9){ p.push(i); i+=2; } } return p; }
 function vEachNal(au,cb){ for(var i=0;i+3<au.length;i++){ if(au[i]===0&&au[i+1]===0&&au[i+2]===1){ cb(i+3); i+=2; } } }
@@ -268,12 +272,13 @@ function vIsKey(au){ var k=false; vEachNal(au,function(s){ var t=au[s]&0x1f; if(
 function vCodecFromAU(au){ var c=null; vEachNal(au,function(s){ if((au[s]&0x1f)===7&&au[s+3]!==undefined){ var h=function(n){return n.toString(16).padStart(2,'0');}; c='avc1.'+h(au[s+1])+h(au[s+2])+h(au[s+3]); } }); return c; }
 function vEnsureDecoder(){
   vdecoder=new VideoDecoder({
-    output:function(frame){ frameQueue.push(frame); if(frameQueue.length>V_MAX+12){ var f=frameQueue.shift(); try{f.close();}catch(e){} } },
-    error:function(e){ vResetDecoder(); }
+    output:function(frame){ vFrames++; frameQueue.push(frame); if(frameQueue.length>V_MAX+12){ var f=frameQueue.shift(); try{f.close();}catch(e){} } },
+    error:function(e){ vErr='decoder: '+(e&&e.message||e); vResetDecoder(); }
   });
 }
 function vResetDecoder(){ try{ if(vdecoder&&vdecoder.state!=='closed')vdecoder.close(); }catch(e){} vdecoder=null;vconfigured=false;vbuf=new Uint8Array(0);vts=0; for(var i=0;i<frameQueue.length;i++){try{frameQueue[i].close();}catch(e){}} frameQueue=[]; vPlaying=false; }
 function onVideoBytes(u8){
+  vBytes+=u8.length;
   vbuf=vConcat(vbuf,u8);
   var pos=vAudPositions(vbuf); if(pos.length<2) return;
   for(var k=0;k<pos.length-1;k++){
@@ -282,9 +287,9 @@ function onVideoBytes(u8){
       if(!key) continue;
       if(!vdecoder) vEnsureDecoder();
       var codec=vCodecFromAU(au)||'avc1.640028';
-      try{ vdecoder.configure({codec:codec, optimizeForLatency:true}); vconfigured=true; }catch(e){ return; }
+      try{ vdecoder.configure({codec:codec, optimizeForLatency:true}); vconfigured=true; vCfg=codec; }catch(e){ vErr='configure('+codec+'): '+e.message; return; }
     }
-    try{ if(vdecoder&&vdecoder.state==='configured'){ vdecoder.decode(new EncodedVideoChunk({type:key?'key':'delta', timestamp:vts, data:au})); vts+=16666; } }catch(e){}
+    try{ if(vdecoder&&vdecoder.state==='configured'){ vdecoder.decode(new EncodedVideoChunk({type:key?'key':'delta', timestamp:vts, data:au})); vts+=16666; } }catch(e){ vErr='decode: '+e.message; }
   }
   vbuf=vbuf.slice(pos[pos.length-1]);
 }
@@ -300,9 +305,23 @@ function vDrawLoop(){
 }
 function setupVideo(ch){
   videoCh=ch; ch.binaryType='arraybuffer';
+  vBytes=0; vFrames=0; vErr=''; vCfg='';
   vResetDecoder(); if(!vRaf) vDrawLoop();
   ch.onmessage=function(ev){ onVideoBytes(new Uint8Array(ev.data)); };
+  startDbg();
 }
+function startDbg(){
+  if(vDbgTimer) clearInterval(vDbgTimer);
+  var t0=Date.now();
+  vDbgTimer=setInterval(function(){
+    var d=$('dbg'); if(!d) return;
+    var secs=((Date.now()-t0)/1000)|0;
+    d.textContent='diagnóstico · vídeo recebido: '+((vBytes/1024)|0)+' KB · codec: '+(vCfg||'—')+' · quadros: '+vFrames+(vErr?('\nERRO: '+vErr):'');
+    if(vFrames===0 && secs>=3) d.classList.add('on');       // tela preta -> mostra o diagnostico
+    else if(vFrames>0 && secs>6) d.classList.remove('on');  // funcionou -> some
+  },1000);
+}
+function stopDbg(){ if(vDbgTimer){ clearInterval(vDbgTimer); vDbgTimer=null; } var d=$('dbg'); if(d){ d.classList.remove('on'); d.textContent=''; } }
 
 // ================= CONTROLE POR TOQUE =================
 var heldButtons=0, lastMove=0;
@@ -407,6 +426,7 @@ function cleanup(keepScreen){
   try{ if(videoCh) videoCh.close(); }catch(e){} videoCh=null;
   try{ if(pc) pc.close(); }catch(e){} pc=null; pending=[];
   try{ if(ws){ ws.onclose=null; ws.close(); } }catch(e){} ws=null;
+  stopDbg();
   vResetDecoder(); if(!keepScreen){ if(vRaf){cancelAnimationFrame(vRaf); vRaf=0;} }
   try{ cctx.clearRect(0,0,canvas.width,canvas.height); }catch(e){}
   try{ var a=$('aud'); a.srcObject=null; }catch(e){}
