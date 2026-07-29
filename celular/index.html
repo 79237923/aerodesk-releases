@@ -352,6 +352,17 @@ var zoom=1, panX=0, panY=0; // zoom/pan da tela (gesto de pinca)
 function applyVp(){ if(vp) vp.style.transform='translate('+panX+'px,'+panY+'px) scale('+zoom+')'; }
 function resetZoom(){ zoom=1; panX=0; panY=0; applyVp(); }
 function clampPan(){ var W=window.innerWidth,H=window.innerHeight; panX=Math.min(0,Math.max(W*(1-zoom),panX)); panY=Math.min(0,Math.max(H*(1-zoom),panY)); }
+// Com zoom, a TELA acompanha o cursor: se ele chega perto da borda visivel, arrasta a tela
+// pra mante-lo a vista (igual AnyDesk). So atua com zoom > 1.
+function followCursor(){
+  if(zoom<=1.01) return;
+  var W=window.innerWidth, H=window.innerHeight, vd=videoDisp();
+  var sx=panX+(vd.ox+cursorX*vd.cw)*zoom, sy=panY+(vd.oy+cursorY*vd.chh)*zoom; // posicao do cursor na TELA
+  var m=Math.min(W,H)*0.2; // margem: comeca a arrastar quando o cursor entra nessa faixa da borda
+  if(sx<m) panX+=(m-sx); else if(sx>W-m) panX-=(sx-(W-m));
+  if(sy<m) panY+=(m-sy); else if(sy>H-m) panY-=(sy-(H-m));
+  clampPan(); applyVp();
+}
 function videoDisp(){ // area do video na tela BASE (sem zoom), object-fit:contain
   var W=window.innerWidth, H=window.innerHeight, vw=canvas.width, vh=canvas.height, cw, chh;
   if(!vw||!vh){ cw=W; chh=H; } else { var elA=W/H, vA=vw/vh; if(elA>vA){ chh=H; cw=H*vA; } else { cw=W; chh=W/vA; } }
@@ -363,6 +374,7 @@ function moveCursorBy(dx,dy,buttons){
   cursorX=Math.max(0,Math.min(1, cursorX + (dx/zoom/vd.cw)*SENS)); // divide pelo zoom: cursor acompanha o dedo 1:1 visual
   cursorY=Math.max(0,Math.min(1, cursorY + (dy/zoom/vd.chh)*SENS));
   drawLocalCursor();
+  followCursor(); // com zoom, a tela segue o cursor
   var now=performance.now(); if(now-lastMove>16 || buttons){ lastMove=now; sendInput({type:'mouse-move', x:cursorX, y:cursorY, buttons:buttons||0}); }
 }
 function clickAt(button){ sendInput({type:'mouse-down',button:button,x:cursorX,y:cursorY}); sendInput({type:'mouse-up',button:button,x:cursorX,y:cursorY}); }
