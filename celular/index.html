@@ -51,6 +51,10 @@
   #vstatus{ position:absolute; top:50%; left:0; right:0; transform:translateY(-50%); text-align:center; color:#cfd3df; font-size:15px; padding:0 20px; z-index:4; }
   #dbg{ position:absolute; left:6px; right:6px; top:calc(env(safe-area-inset-top) + 50px); z-index:7; font:11px/1.5 monospace; color:#9f9; background:#000c; padding:7px 9px; border-radius:8px; white-space:pre-wrap; display:none; }
   #dbg.on{ display:block; }
+  /* cursor LOCAL (instantaneo) — ponta no canto superior-esquerdo do elemento */
+  #lcur{ position:absolute; width:22px; height:28px; z-index:6; pointer-events:none; display:none;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 20'%3E%3Cpath d='M0 0 L0 16 L4 12.5 L6.6 18.6 L9 17.6 L6.4 11.5 L12 11.5 Z' fill='white' stroke='black' stroke-width='1.2' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center/contain;
+    filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.6)); }
   /* Barra de teclas especiais */
   #keysbar{ position:absolute; left:0; right:0; bottom:0; display:none; gap:5px; padding:7px 6px calc(env(safe-area-inset-bottom) + 7px); background:#0d0f13ee; z-index:6; overflow-x:auto; }
   #keysbar.on{ display:flex; }
@@ -94,19 +98,26 @@
       <option value="equilibrado">Equilibrada (720p)</option>
       <option value="nitido">Nítida (resolução cheia) — pesada</option>
     </select>
+    <label>Sensibilidade do cursor (estilo trackpad)</label>
+    <select id="sens">
+      <option value="0.9">Lenta (mais precisa)</option>
+      <option value="1.4">Média</option>
+      <option value="2.2">Rápida</option>
+    </select>
     <label>Endereço do servidor</label>
     <input id="srv" type="text" placeholder="wss://...">
     <button class="btn sec" id="btnSaveCfg">Salvar configurações</button>
   </details>
 
   <div class="hint" style="margin-top:20px">
-    Dica: toque <b>= clique</b> · segurar <b>= clique direito</b> · arrastar <b>= mover/arrastar</b> · dois dedos <b>= rolar</b>. Use o botão <b>⌨</b> pro teclado.
+    <b style="color:var(--text)">Controle estilo touchpad:</b> arraste o dedo <b>= move o cursor</b> · toque <b>= clique</b> · segurar (ou 2 dedos) <b>= clique direito</b> · 2 dedos arrastando <b>= rolar</b> · toque-duplo e arraste <b>= arrastar</b>. Botão <b>⌨</b> abre o teclado. Ajuste a velocidade em Configurações.
   </div>
 </div>
 
 <!-- ================= TELA DO VIEWER ================= -->
 <div id="viewer">
   <canvas id="screen"></canvas>
+  <div id="lcur"></div>
   <div id="vstatus">Conectando...</div>
   <div id="dbg"></div>
   <div id="topbar">
@@ -173,13 +184,15 @@ function renderFavs(){
 }
 function refreshCfg(){
   $('lic').value=LICENSE; $('srv').value=SERVER; $('qual').value=QUALITY;
+  try{ $('sens').value=String(SENS); }catch(e){}
   $('licinfo').textContent=licInfo(LICENSE);
   $('needLic').style.display=LICENSE?'none':'block';
   MYID=idFromToken(LICENSE);
 }
 $('btnSaveCfg').onclick=function(){
   LICENSE=$('lic').value.trim(); SERVER=($('srv').value.trim()||DEF_SERVER); QUALITY=$('qual').value;
-  set('m_license',LICENSE); set('m_server',SERVER); set('m_quality',QUALITY);
+  SENS=parseFloat($('sens').value)||1.4;
+  set('m_license',LICENSE); set('m_server',SERVER); set('m_quality',QUALITY); set('m_sens',String(SENS));
   refreshCfg(); $('err').textContent='Configurações salvas.'; $('err').style.color='var(--green)';
 };
 $('lic').addEventListener('input',function(){ $('licinfo').textContent=licInfo($('lic').value.trim()); });
@@ -249,7 +262,8 @@ function setupControl(ch){
     connected=true; vstatus(''); $('vstatus').style.display='none';
     sendInput({type:'hello', build:'mobile'});
     sendInput({type:'quality', mode:QUALITY});
-    sendInput({type:'cursor-mode', drawCursor:true, watch:false}); // mostra o ponteiro DENTRO do video (bom pro toque)
+    sendInput({type:'cursor-mode', drawCursor:false, watch:false}); // sem ponteiro no video: mostro o cursor LOCAL (instantaneo)
+    cursorX=0.5; cursorY=0.5; drawLocalCursor();
     if(hbTimer) clearInterval(hbTimer);
     hbTimer=setInterval(function(){ sendInput({type:'mouse-state', buttons:heldButtons}); }, 150);
     keepAwake();
@@ -323,55 +337,63 @@ function startDbg(){
 }
 function stopDbg(){ if(vDbgTimer){ clearInterval(vDbgTimer); vDbgTimer=null; } var d=$('dbg'); if(d){ d.classList.remove('on'); d.textContent=''; } }
 
-// ================= CONTROLE POR TOQUE =================
+// ============ CONTROLE POR TOQUE — estilo TRACKPAD (igual AnyDesk) ============
+// Arrastar o dedo move o cursor RELATIVO (como o touchpad do notebook); toque=clique
+// esquerdo; segurar OU 2 dedos=clique direito; 2 dedos arrastando=rolar; toque-duplo-e-
+// arrastar=arrastar (segura o esquerdo). O cursor e LOCAL (instantaneo, sem atraso do video).
 var heldButtons=0, lastMove=0;
-function norm(cx,cy){
-  var r=canvas.getBoundingClientRect(), vw=canvas.width, vh=canvas.height;
-  if(!vw||!vh||!r.width||!r.height) return null;
-  var elA=r.width/r.height, vA=vw/vh, cw,chh,ox,oy;
-  if(elA>vA){ chh=r.height; cw=r.height*vA; ox=(r.width-cw)/2; oy=0; } else { cw=r.width; chh=r.width/vA; ox=0; oy=(r.height-chh)/2; }
-  var x=(cx-r.left-ox)/cw, y=(cy-r.top-oy)/chh;
-  if(x<0||x>1||y<0||y>1) return null;
-  return {x:x,y:y};
+var cursorX=0.5, cursorY=0.5, SENS=parseFloat(get('m_sens','1.4'))||1.4;
+var lcur=$('lcur');
+function videoDisp(){ // area REAL do video na tela (object-fit:contain) + canto
+  var r=canvas.getBoundingClientRect(), vw=canvas.width, vh=canvas.height, cw, chh;
+  if(!vw||!vh){ cw=r.width; chh=r.height; } else { var elA=r.width/r.height, vA=vw/vh; if(elA>vA){ chh=r.height; cw=r.height*vA; } else { cw=r.width; chh=r.width/vA; } }
+  return { cw:cw, chh:chh, ox:r.left+(r.width-cw)/2, oy:r.top+(r.height-chh)/2 };
 }
-var tStart=null,tMoved=false,dragging=false,longTimer=null,twoPrevY=0,twoMode=false;
+function drawLocalCursor(){ if(!lcur) return; var vd=videoDisp(); lcur.style.left=(vd.ox+cursorX*vd.cw)+'px'; lcur.style.top=(vd.oy+cursorY*vd.chh)+'px'; lcur.style.display='block'; }
+function moveCursorBy(dx,dy,buttons){
+  var vd=videoDisp();
+  cursorX=Math.max(0,Math.min(1, cursorX + (dx/vd.cw)*SENS));
+  cursorY=Math.max(0,Math.min(1, cursorY + (dy/vd.chh)*SENS));
+  drawLocalCursor();
+  var now=performance.now(); if(now-lastMove>16 || buttons){ lastMove=now; sendInput({type:'mouse-move', x:cursorX, y:cursorY, buttons:buttons||0}); }
+}
+function clickAt(button){ sendInput({type:'mouse-down',button:button,x:cursorX,y:cursorY}); sendInput({type:'mouse-up',button:button,x:cursorX,y:cursorY}); }
+
+var single=null, downTime=0, moved=0, dragging=false, dragArmed=false, lastTap=0, longTimer=null, two=null;
 canvas.addEventListener('touchstart',function(e){
   e.preventDefault();
+  if(e.touches.length===2){
+    two={ y:(e.touches[0].clientY+e.touches[1].clientY)/2, moved:false, time:Date.now() }; single=null; clearTimeout(longTimer);
+    if(dragging){ sendInput({type:'mouse-up',button:0,x:cursorX,y:cursorY}); dragging=false; heldButtons=0; } dragArmed=false;
+    return;
+  }
   if(e.touches.length===1){
-    var t=e.touches[0], n=norm(t.clientX,t.clientY);
-    tStart={cx:t.clientX,cy:t.clientY,n:n,time:Date.now()}; tMoved=false; dragging=false; twoMode=false;
-    if(n) sendInput({type:'mouse-move', x:n.x, y:n.y, buttons:0});
+    var t=e.touches[0]; single={x:t.clientX,y:t.clientY}; downTime=Date.now(); moved=0; two=null;
+    if(Date.now()-lastTap<300) dragArmed=true; // toque-duplo -> arma o arrastar
     clearTimeout(longTimer);
-    longTimer=setTimeout(function(){ // segurar = clique direito
-      if(!tMoved && tStart && tStart.n){ sendInput({type:'mouse-down',button:2,x:tStart.n.x,y:tStart.n.y}); sendInput({type:'mouse-up',button:2,x:tStart.n.x,y:tStart.n.y}); tStart=null; navigator.vibrate&&navigator.vibrate(15); }
-    },520);
-  } else if(e.touches.length===2){ twoMode=true; dragging=false; clearTimeout(longTimer); twoPrevY=(e.touches[0].clientY+e.touches[1].clientY)/2; }
+    longTimer=setTimeout(function(){ if(single && moved<8 && !dragging && !dragArmed){ clickAt(2); navigator.vibrate&&navigator.vibrate(12); single=null; } },560); // segurar = clique direito
+  }
 },{passive:false});
 canvas.addEventListener('touchmove',function(e){
   e.preventDefault();
-  if(twoMode && e.touches.length>=2){ // dois dedos = rolar
-    var y=(e.touches[0].clientY+e.touches[1].clientY)/2, d=twoPrevY-y;
-    if(Math.abs(d)>3){ sendInput({type:'wheel', dy:d*2.2, x:0.5, y:0.5}); twoPrevY=y; }
-    return;
-  }
-  if(e.touches.length===1 && tStart){
-    var t=e.touches[0], n=norm(t.clientX,t.clientY);
-    var dx=t.clientX-tStart.cx, dy=t.clientY-tStart.cy;
-    if(!tMoved && (dx*dx+dy*dy)>90){ tMoved=true; clearTimeout(longTimer); dragging=true; heldButtons=1; if(tStart.n) sendInput({type:'mouse-down',button:0,x:tStart.n.x,y:tStart.n.y}); }
-    if(dragging && n){ var now=performance.now(); if(now-lastMove>16){ lastMove=now; sendInput({type:'mouse-move', x:n.x, y:n.y, buttons:1}); } }
+  if(two && e.touches.length>=2){ var y=(e.touches[0].clientY+e.touches[1].clientY)/2, d=two.y-y; if(Math.abs(d)>2){ two.moved=true; sendInput({type:'wheel', dy:d*2.4, x:cursorX, y:cursorY}); two.y=y; } return; }
+  if(single && e.touches.length===1){
+    var t=e.touches[0], dx=t.clientX-single.x, dy=t.clientY-single.y; single.x=t.clientX; single.y=t.clientY;
+    moved += Math.abs(dx)+Math.abs(dy); if(moved>8) clearTimeout(longTimer);
+    if(dragArmed && !dragging && moved>6){ dragging=true; heldButtons=1; sendInput({type:'mouse-down',button:0,x:cursorX,y:cursorY}); }
+    moveCursorBy(dx,dy, dragging?1:0);
   }
 },{passive:false});
 canvas.addEventListener('touchend',function(e){
   e.preventDefault(); clearTimeout(longTimer);
-  if(twoMode){ if(e.touches.length===0) twoMode=false; return; }
-  if(tStart){
-    if(dragging){ sendInput({type:'mouse-up', button:0}); heldButtons=0; dragging=false; }
-    else if(!tMoved && tStart.n){ // toque = clique esquerdo
-      sendInput({type:'mouse-down',button:0,x:tStart.n.x,y:tStart.n.y}); sendInput({type:'mouse-up',button:0,x:tStart.n.x,y:tStart.n.y});
-    }
+  if(two){ if(e.touches.length===0){ if(!two.moved && Date.now()-two.time<260){ clickAt(2); } two=null; } return; }
+  if(e.touches.length===0){
+    if(dragging){ sendInput({type:'mouse-up',button:0,x:cursorX,y:cursorY}); dragging=false; heldButtons=0; }
+    else if(single && moved<12 && Date.now()-downTime<240){ clickAt(0); lastTap=Date.now(); } // toque = clique esquerdo
+    dragArmed=false; single=null;
   }
-  tStart=null; tMoved=false;
 },{passive:false});
+window.addEventListener('resize', function(){ if(connected) drawLocalCursor(); });
 
 // ================= TECLADO =================
 var kb=$('kbInput'), kbLast='';
@@ -430,7 +452,8 @@ function cleanup(keepScreen){
   vResetDecoder(); if(!keepScreen){ if(vRaf){cancelAnimationFrame(vRaf); vRaf=0;} }
   try{ cctx.clearRect(0,0,canvas.width,canvas.height); }catch(e){}
   try{ var a=$('aud'); a.srcObject=null; }catch(e){}
-  heldButtons=0; clearMods();
+  try{ if(lcur) lcur.style.display='none'; }catch(e){}
+  heldButtons=0; dragging=false; dragArmed=false; single=null; two=null; clearMods();
 }
 function hangup(){ try{ wsend({type:'hangup'}); }catch(e){} cleanup(false); releaseAwake(); $('keysbar').classList.remove('on'); showSetup(); }
 
