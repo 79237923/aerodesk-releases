@@ -117,6 +117,7 @@
   <div class="hint" style="margin-top:20px">
     <b style="color:var(--text)">Controle estilo touchpad:</b> arraste o dedo <b>= move o cursor</b> · toque <b>= clique</b> · segurar (ou 2 dedos) <b>= clique direito</b> · <b>pinça = zoom</b> (aproximar/afastar) · com zoom, 2 dedos <b>= mover a tela</b>; sem zoom, 2 dedos <b>= rolar</b> · toque-duplo e arraste <b>= arrastar</b>. Botão <b>⌨</b> = teclado.
   </div>
+  <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:16px;">AeroDesk · celular · <span id="cver"></span></div>
 </div>
 
 <!-- ================= TELA DO VIEWER ================= -->
@@ -358,7 +359,7 @@ function followCursor(){
   if(zoom<=1.01) return;
   var W=window.innerWidth, H=window.innerHeight, vd=videoDisp();
   var sx=panX+(vd.ox+cursorX*vd.cw)*zoom, sy=panY+(vd.oy+cursorY*vd.chh)*zoom; // posicao do cursor na TELA
-  var m=Math.min(W,H)*0.2; // margem: comeca a arrastar quando o cursor entra nessa faixa da borda
+  var m=Math.min(W,H)*0.32; // margem: comeca a arrastar quando o cursor entra nessa faixa da borda (mantem o cursor mais central)
   if(sx<m) panX+=(m-sx); else if(sx>W-m) panX-=(sx-(W-m));
   if(sy<m) panY+=(m-sy); else if(sy>H-m) panY-=(sy-(H-m));
   clampPan(); applyVp();
@@ -501,6 +502,20 @@ if(typeof VideoDecoder==='undefined'){
   $('needLic').style.display='block';
   $('needLic').innerHTML='<b style="color:var(--red)">Atenção:</b> este navegador não suporta vídeo (WebCodecs). No iPhone use o <b>Safari atualizado (iOS 16.4+)</b>; no Android use o <b>Chrome</b>.';
 }
+
+// ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
+// Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
+// uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
+var CELVER='6';
+try{ $('cver').textContent='v'+CELVER; }catch(e){}
+function checkVer(){
+  if(connected) return;
+  fetch('ver.txt?cb='+Date.now(),{cache:'no-store'}).then(function(r){return r.text();}).then(function(t){
+    t=(t||'').trim(); if(t && t!==CELVER){ try{location.reload(true);}catch(e){location.reload();} }
+  }).catch(function(){});
+}
+document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') checkVer(); });
+setTimeout(checkVer, 1500);
 
 // ---------- iniciar ----------
 refreshCfg(); renderFavs();
