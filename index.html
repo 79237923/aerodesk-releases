@@ -25,8 +25,9 @@
     .btn-dl { display: inline-block; background: var(--accent); color: #fff; text-decoration: none; font-size: 19px; font-weight: 600; padding: 16px 42px; border-radius: 12px; transition: background .15s; }
     .btn-dl:hover { background: var(--accent2); }
     .btn-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-    .btn-mac { display: none; background: var(--panel2); border: 1px solid var(--accent); color: var(--text); text-decoration: none; font-size: 19px; font-weight: 600; padding: 15px 36px; border-radius: 12px; transition: background .15s; }
+    .btn-mac { display: none; align-items: center; gap: 10px; background: var(--panel2); border: 1px solid var(--accent); color: var(--text); text-decoration: none; font-size: 19px; font-weight: 600; padding: 15px 36px; border-radius: 12px; transition: background .15s; }
     .btn-mac:hover { background: var(--accent); color: #fff; }
+    .btn-mac svg { width: 20px; height: 20px; flex: 0 0 auto; }
     .dl-meta { margin-top: 12px; color: var(--muted); font-size: 13px; }
     .dl-alt { margin-top: 16px; font-size: 13px; }
     .dl-alt a { color: var(--accent2); }
@@ -89,7 +90,7 @@
     <div class="dl-card">
       <div class="btn-row">
         <a id="btnSetup" class="btn-dl" href="https://github.com/79237923/aerodesk-releases/releases/latest">&#11015;&#65039; Baixar para Windows</a>
-        <a id="btnMac" class="btn-mac" href="https://github.com/79237923/aerodesk-releases/releases/latest">&#63743; Baixar para Mac</a>
+        <a id="btnMac" class="btn-mac" href="https://github.com/79237923/aerodesk-releases/releases/latest"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.36 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.62-1.7-3.19-1.72-1.36-.14-2.65.8-3.34.8-.69 0-1.75-.78-2.87-.76-1.48.02-2.84.86-3.6 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.25 2.74 2.2 1.1-.04 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.08 2.65-2.14.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.3-.88-2.32-3.5zM14.2 5.98c.6-.74 1.01-1.75.9-2.77-.87.04-1.93.58-2.56 1.31-.56.65-1.05 1.69-.92 2.68.97.08 1.97-.49 2.58-1.22z"/></svg> Baixar para Mac</a>
       </div>
       <div id="dlMeta" class="dl-meta">Windows 10/11 &middot; instalador</div>
       <div class="dl-alt">Prefere sem instalar? <a id="btnPortable" href="https://github.com/79237923/aerodesk-releases/releases/latest">Baixe a vers&atilde;o port&aacute;til</a></div>
@@ -185,17 +186,20 @@
           document.getElementById('dlMeta').textContent = 'Windows 10/11 · versão ' + v + ' · ' + mb + ' MB';
         }
         if (portable) document.getElementById('btnPortable').href = portable.browser_download_url;
-        // Mac: o botao so aparece quando a versao mais nova tem o arquivo do Mac.
-        if (macArm) {
+        // Mac: o botao (e as instrucoes) so aparecem quando a versao mais nova tem o arquivo do Mac.
+        // Se so existir o do Intel, mostro ELE como botao principal — nunca um link solto.
+        var macMain = macArm || macIntel;
+        if (macMain) {
           var bm = document.getElementById('btnMac');
-          bm.href = macArm.browser_download_url;
-          bm.style.display = 'inline-block';
+          bm.href = macMain.browser_download_url;
+          bm.style.display = 'inline-flex';
           document.getElementById('macTitle').style.display = 'block';
           document.getElementById('macSteps').style.display = 'block';
-        }
-        if (macIntel) {
-          document.getElementById('btnMacIntel').href = macIntel.browser_download_url;
-          document.getElementById('macIntelRow').style.display = 'block';
+          // O link extra do Intel so faz sentido se o botao principal for o Apple Silicon.
+          if (macArm && macIntel) {
+            document.getElementById('btnMacIntel').href = macIntel.browser_download_url;
+            document.getElementById('macIntelRow').style.display = 'block';
+          }
         }
         if (v) document.getElementById('footVer').textContent = 'v' + v;
       })
