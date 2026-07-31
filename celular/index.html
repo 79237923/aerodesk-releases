@@ -66,7 +66,14 @@
   .kb{ flex:0 0 auto; background:#262a32; border:1px solid var(--border); color:#e7e9ee; border-radius:8px; padding:11px 12px; font-size:14px; font-weight:600; }
   .kb:active{ background:var(--accent); }
   .kb.act{ background:var(--accent); }
-  #kbInput{ position:absolute; left:-2000px; top:0; opacity:0; height:1px; width:1px; }
+  /* Campo invisivel que "ouve" o teclado do celular. NAO usar 1px fora da tela (left:-2000px):
+     nessa condicao o Android/Gboard perde a posicao do cursor e passa a inserir cada letra NO
+     INICIO -> a palavra chegava INVERTIDA no PC. Precisa ter tamanho REAL e ficar DENTRO da tela;
+     escondemos com opacity:0 + cursor transparente. font-size:16px evita o zoom automatico do iOS.
+     pointer-events:none p/ nao roubar toques da barra de cima (o foco e dado pelo botao do teclado). */
+  #kbInput{ position:fixed; left:0; top:0; width:2em; height:1.4em; font-size:16px; opacity:0;
+            border:0; padding:0; margin:0; background:transparent; caret-color:transparent;
+            pointer-events:none; z-index:0; }
 </style>
 </head>
 <body>
@@ -429,18 +436,52 @@ canvas.addEventListener('touchend',function(e){
 window.addEventListener('resize', function(){ if(connected){ clampPan(); applyVp(); drawLocalCursor(); } });
 
 // ================= TECLADO =================
-var kb=$('kbInput'), kbLast='';
-$('btnKb').onclick=function(){ try{ kb.value=''; kbLast=''; kb.focus(); }catch(e){} };
-kb.addEventListener('input',function(){
-  var v=kb.value, i=0; while(i<kbLast.length && i<v.length && kbLast[i]===v[i]) i++;
-  var removed=kbLast.length-i, added=v.slice(i);
-  for(var r=0;r<removed;r++){ tapKey('Backspace','Backspace'); }
-  if(added){ sendInput({type:'text', text:added}); }
-  kbLast=v; if(v.length>300){ kb.value=''; kbLast=''; }
+// COMO FUNCIONA: um campo invisivel (#kbInput) recebe o que voce digita no teclado do celular e
+// nos repassamos ao PC.
+// ANTES (bug da palavra INVERTIDA): comparavamos o texto do campo com o de antes p/ descobrir a
+// letra nova, assumindo que ela entrava NO FIM. Em celular (Gboard) o cursor do campo escondido
+// se perdia e a letra entrava NO INICIO -> a conta dava certo ao contrario e a palavra chegava
+// invertida ("casa" -> "asac").
+// AGORA: usamos o que o navegador ja entrega pronto — e.data (a letra digitada) e e.inputType
+// (a acao: inserir/apagar). Isso NAO depende de onde o cursor esta.
+// PAD: o campo nunca fica vazio (guarda 1 caractere invisivel). Assim o "apagar" sempre tem o que
+// apagar -> o evento sempre dispara, tanto num toque quanto segurando a tecla.
+var kb=$('kbInput'), PAD='\u200B', kbComposing=false, kbSkipUntil=0;
+function kbReset(){ try{ kb.value=PAD; }catch(e){} }
+function kbStrip(s){ return String(s == null ? '' : s).split(PAD).join(''); }
+function kbSend(t){ t=String(t == null ? '' : t); if(t) sendInput({type:'text', text:t.slice(0,500)}); }
+kbReset();
+$('btnKb').onclick=function(){ try{ kbComposing=false; kbSkipUntil=0; kbReset(); kb.focus(); }catch(e){} };
+
+// Texto preditivo / autocorrecao (o teclado vai "montando" a palavra): deixa montar e so envia no
+// fim. Sem isso a palavra sairia letra a letra e depois repetida.
+kb.addEventListener('compositionstart',function(){ kbComposing=true; });
+kb.addEventListener('compositionend',function(){
+  kbComposing=false;
+  kbSend(kbStrip(kb.value));
+  kbReset();
+  kbSkipUntil=Date.now()+150; // alguns navegadores mandam mais um 'input' logo depois: ignorar (senao duplica)
 });
+
+kb.addEventListener('input',function(e){
+  if(e.isComposing || kbComposing) return;                 // montando a palavra: nao envia nem limpa
+  if(Date.now() < kbSkipUntil){ kbSkipUntil=0; kbReset(); return; } // eco do fim da composicao
+  var it=e.inputType||'';
+  if(it.indexOf('delete')===0){                            // apagar (inclui segurar p/ repetir)
+    var del = (it==='deleteContentForward') ? 'Delete' : 'Backspace';
+    tapKey(del,del); kbReset(); return;
+  }
+  if(it==='insertLineBreak'||it==='insertParagraph'){ tapKey('Enter','Enter'); kbReset(); return; }
+  // e.data = exatamente o que foi inserido (imune a posicao do cursor). Se o navegador nao mandar
+  // (mais antigo, ou colar), usa o conteudo do campo sem o PAD.
+  kbSend((e.data != null && e.data !== '') ? e.data : kbStrip(kb.value));
+  kbReset();
+});
+
 kb.addEventListener('keydown',function(e){
-  if(e.key==='Enter'){ tapKey('Enter','Enter'); e.preventDefault(); }
-  else if(e.key==='Backspace' && kb.value===''){ tapKey('Backspace','Backspace'); e.preventDefault(); }
+  if(e.key==='Enter'){ tapKey('Enter','Enter'); e.preventDefault(); kbReset(); }
+  // Backspace NAO fica aqui de proposito: com o PAD, o 'input' acima cobre 1 toque E segurar,
+  // sem depender de preventDefault (que o teclado de celular costuma ignorar).
 });
 function tapKey(code,key){ sendInput({type:'key-down',code:code,key:key||code}); sendInput({type:'key-up',code:code,key:key||code}); }
 
@@ -506,7 +547,7 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='6';
+var CELVER='7';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
 function checkVer(){
   if(connected) return;
