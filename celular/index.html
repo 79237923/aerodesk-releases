@@ -359,17 +359,44 @@ var lcur=$('lcur'), vp=$('vp');
 var zoom=1, panX=0, panY=0; // zoom/pan da tela (gesto de pinca)
 function applyVp(){ if(vp) vp.style.transform='translate('+panX+'px,'+panY+'px) scale('+zoom+')'; }
 function resetZoom(){ zoom=1; panX=0; panY=0; applyVp(); }
-function clampPan(){ var W=window.innerWidth,H=window.innerHeight; panX=Math.min(0,Math.max(W*(1-zoom),panX)); panY=Math.min(0,Math.max(H*(1-zoom),panY)); }
-// Com zoom, a TELA acompanha o cursor: se ele chega perto da borda visivel, arrasta a tela
-// pra mante-lo a vista (igual AnyDesk). So atua com zoom > 1.
+// TECLADO DO CELULAR: quando ele abre, cobre a parte de baixo da tela — inclusive o lugar onde
+// voce esta digitando no PC. O `visualViewport` diz QUANTO ficou coberto; guardamos em kbInset e
+// (a) deixamos a tela poder subir mais e (b) empurramos a imagem pra manter o cursor A VISTA.
+var kbInset=0; // altura coberta pelo teclado (px). 0 = teclado fechado.
+function visH(){ return window.innerHeight - kbInset; } // altura REALMENTE visivel
+function clampPan(){
+  var W=window.innerWidth,H=window.innerHeight;
+  panX=Math.min(0,Math.max(W*(1-zoom),panX));
+  // Com o teclado aberto, permitimos subir a imagem mais um tanto (kbInset) — senao, sem zoom,
+  // nao haveria pra onde mover e o cursor ficaria preso atras do teclado.
+  panY=Math.min(0,Math.max(H*(1-zoom)-kbInset,panY));
+}
+// A TELA acompanha o cursor: se ele chega perto da borda VISIVEL, arrasta a tela pra mante-lo a
+// vista (igual AnyDesk). Atua com zoom > 1 OU com o teclado aberto (a area visivel encolheu).
 function followCursor(){
-  if(zoom<=1.01) return;
-  var W=window.innerWidth, H=window.innerHeight, vd=videoDisp();
+  if(zoom<=1.01 && !kbInset) return;
+  var W=window.innerWidth, H=visH(), vd=videoDisp();
   var sx=panX+(vd.ox+cursorX*vd.cw)*zoom, sy=panY+(vd.oy+cursorY*vd.chh)*zoom; // posicao do cursor na TELA
-  var m=Math.min(W,H)*0.32; // margem: comeca a arrastar quando o cursor entra nessa faixa da borda (mantem o cursor mais central)
+  var m=Math.min(W,H)*0.32; // margem: comeca a arrastar quando o cursor entra nessa faixa da borda
   if(sx<m) panX+=(m-sx); else if(sx>W-m) panX-=(sx-(W-m));
   if(sy<m) panY+=(m-sy); else if(sy>H-m) panY-=(sy-(H-m));
   clampPan(); applyVp();
+}
+// Descobre o quanto o teclado esta cobrindo e reage: sobe a imagem pro cursor ficar visivel e
+// levanta a barra de teclas especiais pra ela nao ficar atras do teclado.
+function onViewportResize(){
+  var vv=window.visualViewport; if(!vv) return;
+  var novo=Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+  if(Math.abs(novo-kbInset)<8) return;         // variacao boba (barra do navegador): ignora
+  kbInset=novo;
+  var kbar=$('keysbar'); if(kbar) kbar.style.transform = kbInset ? ('translateY(-'+kbInset+'px)') : '';
+  clampPan(); applyVp();
+  followCursor();                               // puxa o cursor pra cima do teclado
+  drawLocalCursor();
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', onViewportResize);
+  window.visualViewport.addEventListener('scroll', onViewportResize);
 }
 function videoDisp(){ // area do video na tela BASE (sem zoom), object-fit:contain
   var W=window.innerWidth, H=window.innerHeight, vw=canvas.width, vh=canvas.height, cw, chh;
@@ -547,7 +574,7 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='7';
+var CELVER='8';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
 function checkVer(){
   if(connected) return;
