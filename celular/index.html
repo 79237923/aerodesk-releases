@@ -52,6 +52,7 @@
   #topbar .sp{ flex:1; }
   .tb{ background:#ffffff1c; border:0; color:#fff; border-radius:9px; padding:9px 11px; font-size:14px; font-weight:600; }
   .tb:active{ background:#ffffff33; }
+  .tb.act{ background:var(--accent); } /* teclado ABERTO (o botao fica aceso) */
   .tb.red:active{ background:var(--red); }
   #vstatus{ position:absolute; top:50%; left:0; right:0; transform:translateY(-50%); text-align:center; color:#cfd3df; font-size:15px; padding:0 20px; z-index:4; }
   #dbg{ position:absolute; left:6px; right:6px; top:calc(env(safe-area-inset-top) + 50px); z-index:7; font:11px/1.5 monospace; color:#9f9; background:#000c; padding:7px 9px; border-radius:8px; white-space:pre-wrap; display:none; }
@@ -478,7 +479,20 @@ function kbReset(){ try{ kb.value=PAD; }catch(e){} }
 function kbStrip(s){ return String(s == null ? '' : s).split(PAD).join(''); }
 function kbSend(t){ t=String(t == null ? '' : t); if(t) sendInput({type:'text', text:t.slice(0,500)}); }
 kbReset();
-$('btnKb').onclick=function(){ try{ kbComposing=false; kbSkipUntil=0; kbReset(); kb.focus(); }catch(e){} };
+// O botao ⌨ ABRE e FECHA o teclado (antes so abria: clicar de novo nao fechava, porque o
+// handler sempre dava focus() no campo — e dar foco e justamente o que mantem o teclado aberto).
+// Guardamos o estado num flag proprio: no momento do clique o foco ja pode ter mudado para o
+// botao, entao olhar document.activeElement nao seria confiavel.
+var kbOpen=false;
+function kbMarcar(on){ kbOpen=on; try{ $('btnKb').classList.toggle('act', on); }catch(e){} }
+kb.addEventListener('focus', function(){ kbMarcar(true); });
+kb.addEventListener('blur',  function(){ kbMarcar(false); });
+$('btnKb').onclick=function(){
+  try{
+    if(kbOpen){ kbMarcar(false); kb.blur(); return; }   // ja aberto -> FECHA
+    kbComposing=false; kbSkipUntil=0; kbReset(); kb.focus();
+  }catch(e){}
+};
 
 // Texto preditivo / autocorrecao (o teclado vai "montando" a palavra): deixa montar e so envia no
 // fim. Sem isso a palavra sairia letra a letra e depois repetida.
@@ -574,7 +588,7 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='8';
+var CELVER='9';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
 function checkVer(){
   if(connected) return;
