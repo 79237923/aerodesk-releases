@@ -49,6 +49,12 @@
   #screen{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; touch-action:none; background:#000; }
   #topbar{ position:absolute; top:0; left:0; right:0; display:flex; align-items:center; gap:6px; padding:calc(env(safe-area-inset-top) + 6px) 8px 6px; background:linear-gradient(#000a,#0000); z-index:5; transition:opacity .25s; }
   #topbar.hide{ opacity:0; pointer-events:none; }
+  /* Aba para TRAZER A BARRA DE VOLTA (aparece so quando a barra esta escondida). */
+  #showBar{ position:absolute; top:0; left:50%; transform:translateX(-50%); display:none; z-index:7;
+            background:#000000b3; border:0; color:#fff; font-size:13px; font-weight:700;
+            padding:calc(env(safe-area-inset-top) + 5px) 26px 7px; border-radius:0 0 12px 12px; }
+  #showBar.on{ display:block; }
+  #showBar:active{ background:var(--accent); }
   #topbar .sp{ flex:1; }
   .tb{ background:#ffffff1c; border:0; color:#fff; border-radius:9px; padding:9px 11px; font-size:14px; font-weight:600; }
   .tb:active{ background:#ffffff33; }
@@ -138,8 +144,12 @@
     <div class="sp"></div>
     <button class="tb" id="btnKb">⌨ Teclado</button>
     <button class="tb" id="btnSpecial">⋯ Teclas</button>
-    <button class="tb" id="btnHideBar">▲</button>
+    <button class="tb" id="btnHideBar" title="Esconder a barra (ver a tela inteira)">▲</button>
   </div>
+  <!-- Aba pequena que FICA VISIVEL quando a barra esta escondida: sem ela nao havia como
+       trazer a barra de volta (o #topbar escondido fica com pointer-events:none, entao nem a
+       propria setinha aceitava clique) e o usuario ficava sem o botao Sair. -->
+  <button id="showBar" title="Mostrar a barra">▼</button>
   <div id="keysbar">
     <button class="kb" data-k="Escape">Esc</button>
     <button class="kb" data-k="Tab">Tab</button>
@@ -552,9 +562,22 @@ function comboKeys(codes){ // segura todos, solta na ordem inversa
 
 // ================= barra / status / sair =================
 function vstatus(t){ var e=$('vstatus'); e.textContent=t; e.style.display=t?'block':'none'; }
-$('btnHideBar').onclick=function(){ $('topbar').classList.toggle('hide'); };
+// A setinha ▲ esconde a barra p/ voce ver a TELA INTEIRA. Ao esconder, tambem fechamos o teclado
+// (se estiver aberto) — a ideia e "sumir com tudo e ver a tela". E aparece a aba ▼ no topo p/
+// trazer a barra de volta: ANTES nao havia volta (a barra escondida ignora toques) e voce ficava
+// sem o botao Sair.
+function setBarHidden(esconder){
+  $('topbar').classList.toggle('hide', esconder);
+  $('showBar').classList.toggle('on', esconder);
+  if(esconder){
+    try{ if(kbOpen){ kbMarcar(false); kb.blur(); } }catch(e){}   // esconder tudo = fecha o teclado
+    try{ $('keysbar').classList.remove('on'); }catch(e){}        // ...e a barra de teclas especiais
+  }
+}
+$('btnHideBar').onclick=function(){ setBarHidden(true); };
+$('showBar').onclick=function(){ setBarHidden(false); };
 $('btnHang').onclick=hangup;
-function showViewer(){ $('setup').style.display='none'; $('viewer').style.display='flex'; }
+function showViewer(){ $('setup').style.display='none'; $('viewer').style.display='flex'; try{ setBarHidden(false); }catch(e){} } // sessao nova sempre COM a barra a vista
 function showSetup(){ $('viewer').style.display='none'; $('setup').style.display='block'; }
 function cleanup(keepScreen){
   connected=false;
@@ -588,7 +611,7 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='9';
+var CELVER='10';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
 function checkVer(){
   if(connected) return;
