@@ -61,6 +61,8 @@
   .tb.act{ background:var(--accent); } /* teclado ABERTO (o botao fica aceso) */
   .tb.red:active{ background:var(--red); }
   #reconnBadge{ position:absolute; top:10px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.82); color:#fff; padding:7px 15px; border-radius:18px; font-size:13px; display:none; z-index:8; pointer-events:none; }
+  #idleWarn{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(20,14,0,.93); color:#ffcf70; border:1px solid #e8a33d; padding:14px 18px; border-radius:12px; font-size:14px; max-width:82vw; text-align:center; display:none; z-index:9; pointer-events:none; }
+  #idleWarn.on{ display:block; }
   #reconnBadge .rdot{ display:inline-block; width:7px; height:7px; border-radius:50%; background:#e8a33d; margin-right:7px; vertical-align:middle; animation:rcp 1s infinite; }
   @keyframes rcp{ 0%,100%{opacity:1} 50%{opacity:.25} }
   #vstatus{ position:absolute; top:50%; left:0; right:0; transform:translateY(-50%); text-align:center; color:#cfd3df; font-size:15px; padding:0 20px; z-index:4; }
@@ -142,6 +144,7 @@
   <div id="vp"><canvas id="screen"></canvas><div id="lcur"></div></div>
   <div id="vstatus">Conectando...</div>
   <div id="reconnBadge"><span class="rdot"></span>Conexão caiu — reconectando...</div>
+  <div id="idleWarn"></div>
   <div id="dbg"></div>
   <div id="topbar">
     <button class="tb red" id="btnHang">✕ Sair</button>
@@ -242,14 +245,18 @@ var reconnTries=0, reconnTimer=null, userHungUp=false, reconectando=false;
 var RECONN_MAX=20;
 // ENCERRAR POR INATIVIDADE: se ficar 10 min sem mexer (sem toque/tecla enviado ao PC), a conexao
 // e encerrada com aviso. O heartbeat automatico (mouse-state) NAO conta como mexer.
-var IDLE_MS=10*60*1000, lastActivity=0, idleTimer=null;
-function marcarAtividade(){ lastActivity=Date.now(); }
+var IDLE_MS=10*60*1000, IDLE_WARN_MS=60*1000, lastActivity=0, idleTimer=null, idleWarnOn=false;
+function marcarAtividade(){ lastActivity=Date.now(); if(idleWarnOn) hideIdleWarn(); } // tocou -> o aviso some na hora
+function showIdleWarn(seg){ var e=document.getElementById('idleWarn'); if(!e) return; e.textContent='Sem uso ha um tempo — a conexao vai encerrar por inatividade em '+seg+'s. Toque na tela para continuar.'; e.classList.add('on'); idleWarnOn=true; }
+function hideIdleWarn(){ if(!idleWarnOn) return; idleWarnOn=false; var e=document.getElementById('idleWarn'); if(e) e.classList.remove('on'); }
 function ligarIdle(){ if(idleTimer) return; idleTimer=setInterval(function(){
-  if(userHungUp) return;
-  if(!controlCh || controlCh.readyState!=='open') return; // so quando conectado de verdade
-  if(Date.now()-lastActivity>=IDLE_MS) encerrarPorInatividade();
-},15000); }
-function pararIdle(){ if(idleTimer){ clearInterval(idleTimer); idleTimer=null; } }
+  if(userHungUp || !controlCh || controlCh.readyState!=='open'){ hideIdleWarn(); return; } // so quando conectado de verdade
+  var restante=IDLE_MS-(Date.now()-lastActivity);
+  if(restante<=0) encerrarPorInatividade();
+  else if(restante<=IDLE_WARN_MS) showIdleWarn(Math.ceil(restante/1000)); // ultimos 60s: avisa com contagem
+  else hideIdleWarn();
+},1000); }
+function pararIdle(){ if(idleTimer){ clearInterval(idleTimer); idleTimer=null; } hideIdleWarn(); }
 function encerrarPorInatividade(){
   pararIdle();
   hangup(); // ja faz userHungUp=true, para a reconexao, limpa e volta pra tela de conectar
@@ -672,7 +679,7 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='13';
+var CELVER='14';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
 function checkVer(){
   if(connected) return;
