@@ -240,6 +240,21 @@ var ws=null,pc=null,controlCh=null,videoCh=null,pending=[],hbTimer=null,connecte
 // na tela com um aviso por cima — a tela nao "pisca" de volta pra tela de conectar.
 var reconnTries=0, reconnTimer=null, userHungUp=false, reconectando=false;
 var RECONN_MAX=20;
+// ENCERRAR POR INATIVIDADE: se ficar 10 min sem mexer (sem toque/tecla enviado ao PC), a conexao
+// e encerrada com aviso. O heartbeat automatico (mouse-state) NAO conta como mexer.
+var IDLE_MS=10*60*1000, lastActivity=0, idleTimer=null;
+function marcarAtividade(){ lastActivity=Date.now(); }
+function ligarIdle(){ if(idleTimer) return; idleTimer=setInterval(function(){
+  if(userHungUp) return;
+  if(!controlCh || controlCh.readyState!=='open') return; // so quando conectado de verdade
+  if(Date.now()-lastActivity>=IDLE_MS) encerrarPorInatividade();
+},15000); }
+function pararIdle(){ if(idleTimer){ clearInterval(idleTimer); idleTimer=null; } }
+function encerrarPorInatividade(){
+  pararIdle();
+  hangup(); // ja faz userHungUp=true, para a reconexao, limpa e volta pra tela de conectar
+  showErr('Conexão encerrada porque ficou 10 minutos sem uso (sem mexer). Conecte de novo se quiser continuar.');
+}
 var target='',password='';
 
 function doConnect(){
@@ -250,6 +265,7 @@ function doConnect(){
   showErr('');
   showViewer(); vstatus('Conectando ao servidor...');
   userHungUp=false; reconnTries=0; pararReconexao(); reconectando=false; mostrarAvisoReconn(false);
+  marcarAtividade(); ligarIdle();
   cleanup(true);
   try{ ws=new WebSocket(SERVER); }catch(e){ vstatus('Falha ao abrir o servidor.'); return; }
   ws.onopen=function(){ vstatus('Conectando ao PC '+target+'...'); wsend({type:'connect', target:target, password:password, license:LICENSE, fromId:MYID}); };
@@ -305,7 +321,8 @@ function setupControl(ch){
   ch.onmessage=function(){};
   ch.onclose=function(){};
 }
-function sendInput(o){ if(controlCh&&controlCh.readyState==='open'){ try{ controlCh.send(JSON.stringify(o)); }catch(e){} } }
+var ATIVIDADE={'mouse-move':1,'mouse-down':1,'mouse-up':1,'wheel':1,'key-down':1,'key-up':1,'text':1}; // so isto e 'mexer'
+function sendInput(o){ if(controlCh&&controlCh.readyState==='open'){ if(ATIVIDADE[o.type]) marcarAtividade(); try{ controlCh.send(JSON.stringify(o)); }catch(e){} } }
 
 // ================= VIDEO (WebCodecs) — mesmo protocolo do PC =================
 var canvas=$('screen'), cctx=canvas.getContext('2d');
@@ -462,7 +479,7 @@ canvas.addEventListener('touchmove',function(e){
     } else { // PINCA + PAN (mantem o ponto entre os dedos fixo)
       two.moved=true;
       var z2=Math.max(1,Math.min(4, zoom*ratio)), sc=z2/zoom;
-      panX=m2.x-(two.mx-panX)*sc; panY=m2.y-(two.my-panY)*sc; zoom=z2; clampPan(); applyVp(); drawLocalCursor();
+      panX=m2.x-(two.mx-panX)*sc; panY=m2.y-(two.my-panY)*sc; zoom=z2; clampPan(); applyVp(); drawLocalCursor(); marcarAtividade();
     }
     two.d=d2; two.mx=m2.x; two.my=m2.y; return;
   }
@@ -605,7 +622,7 @@ function cleanup(keepScreen){
   if(!reconectando){ try{ resetZoom(); }catch(e){} }
   heldButtons=0; dragging=false; dragArmed=false; single=null; two=null; clearMods();
 }
-function hangup(){ userHungUp=true; pararReconexao(); reconectando=false; mostrarAvisoReconn(false); try{ wsend({type:'hangup'}); }catch(e){} cleanup(false); releaseAwake(); $('keysbar').classList.remove('on'); showSetup(); }
+function hangup(){ userHungUp=true; pararIdle(); pararReconexao(); reconectando=false; mostrarAvisoReconn(false); try{ wsend({type:'hangup'}); }catch(e){} cleanup(false); releaseAwake(); $('keysbar').classList.remove('on'); showSetup(); }
 
 // ---------- reconexao automatica ----------
 function pararReconexao(){ if(reconnTimer){ clearTimeout(reconnTimer); reconnTimer=null; } }
@@ -655,7 +672,7 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='11';
+var CELVER='13';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
 function checkVer(){
   if(connected) return;
