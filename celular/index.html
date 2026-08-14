@@ -60,6 +60,9 @@
   .tb:active{ background:#ffffff33; }
   .tb.act{ background:var(--accent); } /* teclado ABERTO (o botao fica aceso) */
   .tb.red:active{ background:var(--red); }
+  #reconnBadge{ position:absolute; top:10px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.82); color:#fff; padding:7px 15px; border-radius:18px; font-size:13px; display:none; z-index:8; pointer-events:none; }
+  #reconnBadge .rdot{ display:inline-block; width:7px; height:7px; border-radius:50%; background:#e8a33d; margin-right:7px; vertical-align:middle; animation:rcp 1s infinite; }
+  @keyframes rcp{ 0%,100%{opacity:1} 50%{opacity:.25} }
   #vstatus{ position:absolute; top:50%; left:0; right:0; transform:translateY(-50%); text-align:center; color:#cfd3df; font-size:15px; padding:0 20px; z-index:4; }
   #dbg{ position:absolute; left:6px; right:6px; top:calc(env(safe-area-inset-top) + 50px); z-index:7; font:11px/1.5 monospace; color:#9f9; background:#000c; padding:7px 9px; border-radius:8px; white-space:pre-wrap; display:none; }
   #dbg.on{ display:block; }
@@ -138,6 +141,7 @@
 <div id="viewer">
   <div id="vp"><canvas id="screen"></canvas><div id="lcur"></div></div>
   <div id="vstatus">Conectando...</div>
+  <div id="reconnBadge"><span class="rdot"></span>Conexão caiu — reconectando...</div>
   <div id="dbg"></div>
   <div id="topbar">
     <button class="tb red" id="btnHang">✕ Sair</button>
@@ -230,6 +234,12 @@ function showErr(m,ok){ var e=$('err'); e.textContent=m||''; e.style.color=ok?'v
 
 // ================= CONEXAO / WEBRTC =================
 var ws=null,pc=null,controlCh=null,videoCh=null,pending=[],hbTimer=null,connected=false;
+// RECONEXAO AUTOMATICA (v11) — o PC ja tinha isso (1.8.46/1.8.55); o celular nao. E rede de celular
+// cai MUITO mais (elevador, tunel, trocar de Wi-Fi p/ 4G). Antes, qualquer queda encerrava a sessao
+// em ~1,5s e voce tinha que digitar o ID de novo. Agora ele volta sozinho, mantendo o ultimo quadro
+// na tela com um aviso por cima — a tela nao "pisca" de volta pra tela de conectar.
+var reconnTries=0, reconnTimer=null, userHungUp=false, reconectando=false;
+var RECONN_MAX=20;
 var target='',password='';
 
 function doConnect(){
@@ -239,12 +249,13 @@ function doConnect(){
   MYID=idFromToken(LICENSE); if(!MYID){ showErr('Chave inválida. Cole a chave certa em Configurações.'); return; }
   showErr('');
   showViewer(); vstatus('Conectando ao servidor...');
+  userHungUp=false; reconnTries=0; pararReconexao(); reconectando=false; mostrarAvisoReconn(false);
   cleanup(true);
   try{ ws=new WebSocket(SERVER); }catch(e){ vstatus('Falha ao abrir o servidor.'); return; }
   ws.onopen=function(){ vstatus('Conectando ao PC '+target+'...'); wsend({type:'connect', target:target, password:password, license:LICENSE, fromId:MYID}); };
   ws.onmessage=function(ev){ var m; try{m=JSON.parse(ev.data);}catch(e){return;} onSig(m); };
   ws.onerror=function(){};
-  ws.onclose=function(){ if(connected){ vstatus('Conexão com o servidor caiu.'); } };
+  ws.onclose=function(){ if(connected) agendarReconexao(); };
   // "destrava" o audio no gesto do usuario (iOS)
   try{ var a=$('aud'); a.muted=true; a.play().then(function(){a.muted=false;}).catch(function(){}); }catch(e){}
 }
@@ -256,14 +267,14 @@ function onSig(m){
   else if(m.type==='rejected'){ vstatus('Recusado: '+(m.reason||'senha?')); setTimeout(hangup,1500); }
   else if(m.type==='license-problem'){ vstatus('Assinatura: '+(m.reason||'')+'. Confira a chave.'); setTimeout(hangup,2500); }
   else if(m.type==='error'){ vstatus('Erro: '+(m.message||'')); if(/nao encontrado|encontrado/i.test(m.message||'')){ setTimeout(hangup,2200); } }
-  else if(m.type==='peer-left'){ vstatus('O PC encerrou a conexão.'); setTimeout(hangup,1500); }
+  else if(m.type==='peer-left'){ agendarReconexao(); }
   else if(m.type==='be-secondary'){ /* host ocupado: entra como 2a pessoa */ wsend({type:'connect', target:target, password:password, license:LICENSE, fromId:MYID, sessionId:m.sessionId}); }
 }
 
 function newPc(){
   pc=new RTCPeerConnection({iceServers:ICE});
   pc.onicecandidate=function(e){ if(e.candidate) wsend({type:'signal', data:{candidate:e.candidate}}); };
-  pc.onconnectionstatechange=function(){ if(pc&&(pc.connectionState==='failed'||pc.connectionState==='disconnected')){ vstatus('Conexão instável...'); } };
+  pc.onconnectionstatechange=function(){ if(!pc) return; if(pc.connectionState==='failed'){ agendarReconexao(); } else if(pc.connectionState==='disconnected'){ vstatus('Conexão instável...'); } };
   pc.ondatachannel=function(e){ var ch=e.channel; if(ch.label==='aerodesk-video') setupVideo(ch); else if(ch.label==='aerodesk') setupControl(ch); /* 'aerodesk-file' ignorado */ };
   pc.ontrack=function(e){ try{ var a=$('aud'); a.srcObject=e.streams[0]; a.muted=false; a.play().catch(function(){}); }catch(err){} };
 }
@@ -344,7 +355,7 @@ function setupVideo(ch){
   videoCh=ch; ch.binaryType='arraybuffer';
   vBytes=0; vFrames=0; vErr=''; vCfg='';
   vResetDecoder(); if(!vRaf) vDrawLoop();
-  ch.onmessage=function(ev){ onVideoBytes(new Uint8Array(ev.data)); };
+  ch.onmessage=function(ev){ if(reconnTries||reconectando){ reconnTries=0; reconectando=false; mostrarAvisoReconn(false); vstatus(''); } onVideoBytes(new Uint8Array(ev.data)); };
   startDbg();
 }
 function startDbg(){
@@ -588,13 +599,46 @@ function cleanup(keepScreen){
   try{ if(ws){ ws.onclose=null; ws.close(); } }catch(e){} ws=null;
   stopDbg();
   vResetDecoder(); if(!keepScreen){ if(vRaf){cancelAnimationFrame(vRaf); vRaf=0;} }
-  try{ cctx.clearRect(0,0,canvas.width,canvas.height); }catch(e){}
+  if(!reconectando){ try{ cctx.clearRect(0,0,canvas.width,canvas.height); }catch(e){} }
   try{ var a=$('aud'); a.srcObject=null; }catch(e){}
   try{ if(lcur) lcur.style.display='none'; }catch(e){}
-  try{ resetZoom(); }catch(e){}
+  if(!reconectando){ try{ resetZoom(); }catch(e){} }
   heldButtons=0; dragging=false; dragArmed=false; single=null; two=null; clearMods();
 }
-function hangup(){ try{ wsend({type:'hangup'}); }catch(e){} cleanup(false); releaseAwake(); $('keysbar').classList.remove('on'); showSetup(); }
+function hangup(){ userHungUp=true; pararReconexao(); reconectando=false; mostrarAvisoReconn(false); try{ wsend({type:'hangup'}); }catch(e){} cleanup(false); releaseAwake(); $('keysbar').classList.remove('on'); showSetup(); }
+
+// ---------- reconexao automatica ----------
+function pararReconexao(){ if(reconnTimer){ clearTimeout(reconnTimer); reconnTimer=null; } }
+function mostrarAvisoReconn(on,txt){
+  var e=document.getElementById('reconnBadge'); if(!e) return;
+  if(txt) e.innerHTML='<span class="rdot"></span>'+txt;
+  e.style.display=on?'block':'none';
+}
+function agendarReconexao(){
+  if(userHungUp) return;      // encerrou de proposito: nao insiste
+  if(reconnTimer) return;     // ja ha uma tentativa a caminho
+  if(reconnTries>=RECONN_MAX){ // desistiu: ai sim volta pra tela de conectar
+    reconectando=false; mostrarAvisoReconn(false);
+    vstatus('Não consegui reconectar. Toque em Sair e conecte de novo.');
+    setTimeout(function(){ if(!userHungUp) hangup(); },2500);
+    return;
+  }
+  reconnTries++;
+  reconectando=true;          // faz o cleanup MANTER o ultimo quadro e o zoom
+  mostrarAvisoReconn(true,'Conexão caiu — reconectando... ('+reconnTries+')');
+  cleanup(true);
+  var espera=Math.min(1000*reconnTries,8000); // 1s, 2s, 3s... ate 8s
+  reconnTimer=setTimeout(function(){ reconnTimer=null; if(userHungUp) return; abrirConexao(); },espera);
+}
+// Abre o servidor e pede o PC de novo. Mesma coisa que o doConnect faz, sem mexer na tela nem
+// revalidar o que voce digitou (ID/senha/chave continuam os mesmos).
+function abrirConexao(){
+  try{ ws=new WebSocket(SERVER); }catch(e){ agendarReconexao(); return; }
+  ws.onopen=function(){ wsend({type:'connect', target:target, password:password, license:LICENSE, fromId:MYID}); };
+  ws.onmessage=function(ev){ var m; try{m=JSON.parse(ev.data);}catch(e){return;} onSig(m); };
+  ws.onerror=function(){};
+  ws.onclose=function(){ agendarReconexao(); };
+}
 
 // ---------- manter a tela ligada ----------
 var wakeLock=null;
@@ -611,7 +655,7 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='10';
+var CELVER='11';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
 function checkVer(){
   if(connected) return;
