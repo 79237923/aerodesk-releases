@@ -118,9 +118,9 @@
     <div id="licinfo" class="sub" style="margin-top:4px"></div>
     <label>Qualidade do vídeo</label>
     <select id="qual">
-      <option value="fluido">Fluida (540p) — mais leve, p/ internet fraca</option>
-      <option value="equilibrado">Equilibrada (720p) — recomendada</option>
-      <option value="nitido">Nítida (resolução cheia) — pesada</option>
+      <option value="fluido">Fluida (540p) — só p/ internet muito fraca</option>
+      <option value="equilibrado">Equilibrada (720p) — economiza dados</option>
+      <option value="nitido">Nítida (resolução cheia) — recomendada, dá p/ ler com zoom</option>
     </select>
     <label>Sensibilidade do cursor (estilo trackpad)</label>
     <select id="sens">
@@ -190,7 +190,7 @@ function favsGet(){ try{return JSON.parse(get('m_favs','[]'))||[];}catch(e){retu
 function favsSet(a){ set('m_favs',JSON.stringify(a)); }
 var SERVER=get('m_server',DEF_SERVER);
 var LICENSE=get('m_license','');
-var QUALITY=get('m_quality2','equilibrado'); // 720p (dono pediu; era 540p ate a v14 — chave nova p/ migrar todo mundo)
+var QUALITY=get('m_quality3','nitido'); // resolucao CHEIA: e o que permite LER com zoom (720p ja chega reduzido do PC e o zoom so amplia o borrao). Chave nova p/ migrar quem ja tinha escolha salva.
 var MYID='';
 
 // ---------- utils de licenca (extrai o ID de dentro da chave) ----------
@@ -222,7 +222,7 @@ function refreshCfg(){
 $('btnSaveCfg').onclick=function(){
   LICENSE=$('lic').value.trim(); SERVER=($('srv').value.trim()||DEF_SERVER); QUALITY=$('qual').value;
   SENS=parseFloat($('sens').value)||1.4;
-  set('m_license',LICENSE); set('m_server',SERVER); set('m_quality2',QUALITY); set('m_sens',String(SENS));
+  set('m_license',LICENSE); set('m_server',SERVER); set('m_quality3',QUALITY); set('m_sens',String(SENS));
   refreshCfg(); $('err').textContent='Configurações salvas.'; $('err').style.color='var(--green)';
 };
 $('lic').addEventListener('input',function(){ $('licinfo').textContent=licInfo($('lic').value.trim()); });
@@ -391,7 +391,20 @@ function startDbg(){
     d.textContent='diagnóstico · vídeo recebido: '+((vBytes/1024)|0)+' KB · codec: '+(vCfg||'—')+' · quadros: '+vFrames+(vErr?('\nERRO: '+vErr):'');
     if(vFrames===0 && secs>=3) d.classList.add('on');       // tela preta -> mostra o diagnostico
     else if(vFrames>0 && secs>6) d.classList.remove('on');  // funcionou -> some
+    // Chegou video mas o aparelho NAO decodificou nada em 8s? Provavelmente ele nao da conta da
+    // resolucao cheia. Cai p/ 720p sozinho (uma vez so) em vez de deixar a pessoa na tela preta.
+    if(!quedaAuto && QUALITY==='nitido' && vBytes>50000 && vFrames===0 && secs>=8) quedaAutoQualidade();
   },1000);
+}
+var quedaAuto=false; // so tenta uma vez por sessao
+function quedaAutoQualidade(){
+  quedaAuto=true;
+  QUALITY='equilibrado'; set('m_quality3',QUALITY);
+  try{ $('qual').value=QUALITY; }catch(e){}
+  sendInput({type:'quality', mode:QUALITY});
+  vResetDecoder(); vBytes=0; vFrames=0; vErr='';
+  vstatus('Este aparelho não deu conta da resolução cheia — mudei para 720p.');
+  setTimeout(function(){ vstatus(''); },4000);
 }
 function stopDbg(){ if(vDbgTimer){ clearInterval(vDbgTimer); vDbgTimer=null; } var d=$('dbg'); if(d){ d.classList.remove('on'); d.textContent=''; } }
 
@@ -679,7 +692,7 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='15';
+var CELVER='16';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
 function checkVer(){
   if(connected) return;
