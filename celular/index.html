@@ -118,8 +118,8 @@
     <div id="licinfo" class="sub" style="margin-top:4px"></div>
     <label>Qualidade do vídeo</label>
     <select id="qual">
-      <option value="fluido">Fluida (540p) — leve, boa p/ internet do celular</option>
-      <option value="equilibrado">Equilibrada (720p)</option>
+      <option value="fluido">Fluida (540p) — mais leve, p/ internet fraca</option>
+      <option value="equilibrado">Equilibrada (720p) — recomendada</option>
       <option value="nitido">Nítida (resolução cheia) — pesada</option>
     </select>
     <label>Sensibilidade do cursor (estilo trackpad)</label>
@@ -190,7 +190,7 @@ function favsGet(){ try{return JSON.parse(get('m_favs','[]'))||[];}catch(e){retu
 function favsSet(a){ set('m_favs',JSON.stringify(a)); }
 var SERVER=get('m_server',DEF_SERVER);
 var LICENSE=get('m_license','');
-var QUALITY=get('m_quality','fluido');
+var QUALITY=get('m_quality2','equilibrado'); // 720p (dono pediu; era 540p ate a v14 — chave nova p/ migrar todo mundo)
 var MYID='';
 
 // ---------- utils de licenca (extrai o ID de dentro da chave) ----------
@@ -222,7 +222,7 @@ function refreshCfg(){
 $('btnSaveCfg').onclick=function(){
   LICENSE=$('lic').value.trim(); SERVER=($('srv').value.trim()||DEF_SERVER); QUALITY=$('qual').value;
   SENS=parseFloat($('sens').value)||1.4;
-  set('m_license',LICENSE); set('m_server',SERVER); set('m_quality',QUALITY); set('m_sens',String(SENS));
+  set('m_license',LICENSE); set('m_server',SERVER); set('m_quality2',QUALITY); set('m_sens',String(SENS));
   refreshCfg(); $('err').textContent='Configurações salvas.'; $('err').style.color='var(--green)';
 };
 $('lic').addEventListener('input',function(){ $('licinfo').textContent=licInfo($('lic').value.trim()); });
@@ -679,7 +679,7 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='14';
+var CELVER='15';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
 function checkVer(){
   if(connected) return;
