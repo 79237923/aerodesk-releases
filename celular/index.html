@@ -289,7 +289,12 @@ function onSig(m){
   else if(m.type==='signal'){ handleSignal(m.data); }
   else if(m.type==='rejected'){ vstatus('Recusado: '+(m.reason||'senha?')); setTimeout(hangup,1500); }
   else if(m.type==='license-problem'){ vstatus('Assinatura: '+(m.reason||'')+'. Confira a chave.'); setTimeout(hangup,2500); }
-  else if(m.type==='error'){ vstatus('Erro: '+(m.message||'')); if(/nao encontrado|encontrado/i.test(m.message||'')){ setTimeout(hangup,2200); } }
+  else if(m.type==='error'){
+    // NAO desiste: durante uma reconexao e comum o host ainda estar voltando (o "ID nao
+    // encontrado" e temporario). O PC ja re-tentava nesse caso; o celular desistia na hora.
+    vstatus('Erro: '+(m.message||'')+' — tentando de novo...');
+    agendarReconexao();
+  }
   else if(m.type==='peer-left'){ agendarReconexao(); }
   else if(m.type==='be-secondary'){ /* host ocupado: entra como 2a pessoa */ wsend({type:'connect', target:target, password:password, license:LICENSE, fromId:MYID, sessionId:m.sessionId}); }
 }
@@ -669,12 +674,22 @@ function agendarReconexao(){
 }
 // Abre o servidor e pede o PC de novo. Mesma coisa que o doConnect faz, sem mexer na tela nem
 // revalidar o que voce digitou (ID/senha/chave continuam os mesmos).
+var wsPrazo=null;
+function pararPrazoWs(){ if(wsPrazo){ clearTimeout(wsPrazo); wsPrazo=null; } }
 function abrirConexao(){
+  pararPrazoWs();
   try{ ws=new WebSocket(SERVER); }catch(e){ agendarReconexao(); return; }
-  ws.onopen=function(){ wsend({type:'connect', target:target, password:password, license:LICENSE, fromId:MYID}); };
+  var meu=ws;
+  // PRAZO de 10s: um WebSocket pode ficar TRAVADO em "conectando" (tipico ao voltar de outro app
+  // ou trocar Wi-Fi<->4G) e nesse estado ele nao dispara onopen NEM onclose. Sem este prazo a
+  // corrente de tentativas morria em silencio e o aviso "reconectando" ficava para sempre.
+  wsPrazo=setTimeout(function(){
+    if(meu.readyState!==1){ try{ meu.onclose=null; meu.close(); }catch(e){} if(ws===meu) ws=null; agendarReconexao(); }
+  },10000);
+  ws.onopen=function(){ pararPrazoWs(); wsend({type:'connect', target:target, password:password, license:LICENSE, fromId:MYID}); };
   ws.onmessage=function(ev){ var m; try{m=JSON.parse(ev.data);}catch(e){return;} onSig(m); };
   ws.onerror=function(){};
-  ws.onclose=function(){ agendarReconexao(); };
+  ws.onclose=function(){ pararPrazoWs(); agendarReconexao(); };
 }
 
 // ---------- manter a tela ligada ----------
@@ -682,6 +697,16 @@ var wakeLock=null;
 async function keepAwake(){ try{ if('wakeLock' in navigator){ wakeLock=await navigator.wakeLock.request('screen'); } }catch(e){} }
 function releaseAwake(){ try{ if(wakeLock){ wakeLock.release(); wakeLock=null; } }catch(e){} }
 document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible' && connected) keepAwake(); });
+function sessaoNaTela(){ try{ return $('viewer').style.display!=='none'; }catch(e){ return false; } }
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState!=='visible' || userHungUp || !sessaoNaTela()) return;
+  if(controlCh && controlCh.readyState==='open') return;   // esta tudo certo, nao mexe
+  // Voltou pro app com a conexao caida: nao espera o temporizador (que pode ter congelado).
+  pararReconexao(); pararPrazoWs();
+  reconnTries=0;          // a rede provavelmente voltou -> tenta rapido de novo
+  reconectando=true;
+  agendarReconexao();
+});
 
 // ---------- aviso se o navegador nao tiver WebCodecs ----------
 if(typeof VideoDecoder==='undefined'){
@@ -692,7 +717,7 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='16';
+var CELVER='17';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
 function checkVer(){
   if(connected) return;
