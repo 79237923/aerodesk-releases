@@ -151,6 +151,8 @@
     <div class="sp"></div>
     <button class="tb" id="btnKb">⌨ Teclado</button>
     <button class="tb" id="btnSpecial">⋯ Teclas</button>
+    <button class="tb" id="btnFoto" title="Mandar uma foto/print deste celular para o PC">🖼 Enviar foto</button>
+    <input type="file" id="fotoInput" accept="image/*" style="display:none">
     <button class="tb" id="btnHideBar" title="Esconder a barra (ver a tela inteira)">▲</button>
   </div>
   <!-- Aba pequena que FICA VISIVEL quando a barra esta escondida: sem ela nao havia como
@@ -271,7 +273,7 @@ function doConnect(){
   MYID=idFromToken(LICENSE); if(!MYID){ showErr('Chave inválida. Cole a chave certa em Configurações.'); return; }
   showErr('');
   showViewer(); vstatus('Conectando ao servidor...');
-  userHungUp=false; reconnTries=0; pararReconexao(); reconectando=false; mostrarAvisoReconn(false);
+  userHungUp=false; reconnTries=0; mySessionId=null; pararReconexao(); reconectando=false; mostrarAvisoReconn(false);
   marcarAtividade(); ligarIdle();
   cleanup(true);
   try{ ws=new WebSocket(SERVER); }catch(e){ vstatus('Falha ao abrir o servidor.'); return; }
@@ -282,7 +284,11 @@ function doConnect(){
   // "destrava" o audio no gesto do usuario (iOS)
   try{ var a=$('aud'); a.muted=true; a.play().then(function(){a.muted=false;}).catch(function(){}); }catch(e){}
 }
+var mySessionId=null;   // preenchido só quando entramos como 2a pessoa
 function wsend(o){ try{ if(ws&&ws.readyState===1) ws.send(JSON.stringify(o)); }catch(e){} }
+// Manda sinal do WebRTC marcando a sessao (se formos a 2a pessoa). Sem essa marca o servidor
+// roteia pelo modelo antigo e o handshake nunca fecha.
+function sinal(data){ var o={type:'signal', data:data}; if(mySessionId) o.sessionId=mySessionId; wsend(o); }
 
 function onSig(m){
   if(m.type==='connected-to-host'){ vstatus('Conectado. Recebendo a tela...'); }
@@ -296,14 +302,21 @@ function onSig(m){
     agendarReconexao();
   }
   else if(m.type==='peer-left'){ agendarReconexao(); }
-  else if(m.type==='be-secondary'){ /* host ocupado: entra como 2a pessoa */ wsend({type:'connect', target:target, password:password, license:LICENSE, fromId:MYID, sessionId:m.sessionId}); }
+  else if(m.type==='be-secondary'){
+    // O PC ja tem alguem (as vezes e a NOSSA sessao antiga, que ele ainda nao percebeu que morreu).
+    // Entramos como 2a pessoa — e a partir daqui TODO sinal precisa levar o sessionId, senao o
+    // servidor entrega a resposta no lugar errado e o video nunca chega ("Conectado. Recebendo a
+    // tela..." para sempre). Era exatamente o que travava ao voltar de outro app.
+    mySessionId = m.sessionId || null;
+    wsend({type:'connect', target:target, password:password, license:LICENSE, fromId:MYID, sessionId:mySessionId});
+  }
 }
 
 function newPc(){
   pc=new RTCPeerConnection({iceServers:ICE});
-  pc.onicecandidate=function(e){ if(e.candidate) wsend({type:'signal', data:{candidate:e.candidate}}); };
+  pc.onicecandidate=function(e){ if(e.candidate) sinal({candidate:e.candidate}); };
   pc.onconnectionstatechange=function(){ if(!pc) return; if(pc.connectionState==='failed'){ agendarReconexao(); } else if(pc.connectionState==='disconnected'){ vstatus('Conexão instável...'); } };
-  pc.ondatachannel=function(e){ var ch=e.channel; if(ch.label==='aerodesk-video') setupVideo(ch); else if(ch.label==='aerodesk') setupControl(ch); /* 'aerodesk-file' ignorado */ };
+  pc.ondatachannel=function(e){ var ch=e.channel; if(ch.label==='aerodesk-video') setupVideo(ch); else if(ch.label==='aerodesk') setupControl(ch); else if(ch.label==='aerodesk-file'){ fileCh=ch; ch.binaryType='arraybuffer'; } };
   pc.ontrack=function(e){ try{ var a=$('aud'); a.srcObject=e.streams[0]; a.muted=false; a.play().catch(function(){}); }catch(err){} };
 }
 async function handleSignal(data){
@@ -311,7 +324,7 @@ async function handleSignal(data){
   if(data.sdp){
     try{ await pc.setRemoteDescription(data.sdp); }catch(e){ return; }
     for(var i=0;i<pending.length;i++){ try{ await pc.addIceCandidate(pending[i]); }catch(e){} } pending=[];
-    if(data.sdp.type==='offer'){ var ans=await pc.createAnswer(); await pc.setLocalDescription(ans); wsend({type:'signal', data:{sdp:pc.localDescription}}); }
+    if(data.sdp.type==='offer'){ var ans=await pc.createAnswer(); await pc.setLocalDescription(ans); sinal({sdp:pc.localDescription}); }
   } else if(data.candidate){
     if(pc.remoteDescription&&pc.remoteDescription.type){ try{ await pc.addIceCandidate(data.candidate); }catch(e){} }
     else pending.push(data.candidate);
@@ -637,6 +650,7 @@ function cleanup(keepScreen){
   try{ if(hbTimer){clearInterval(hbTimer); hbTimer=null;} }catch(e){}
   try{ if(controlCh) controlCh.close(); }catch(e){} controlCh=null;
   try{ if(videoCh) videoCh.close(); }catch(e){} videoCh=null;
+  fileCh=null;
   try{ if(pc) pc.close(); }catch(e){} pc=null; pending=[];
   try{ if(ws){ ws.onclose=null; ws.close(); } }catch(e){} ws=null;
   stopDbg();
@@ -647,7 +661,7 @@ function cleanup(keepScreen){
   if(!reconectando){ try{ resetZoom(); }catch(e){} }
   heldButtons=0; dragging=false; dragArmed=false; single=null; two=null; clearMods();
 }
-function hangup(){ userHungUp=true; pararIdle(); pararReconexao(); reconectando=false; mostrarAvisoReconn(false); try{ wsend({type:'hangup'}); }catch(e){} cleanup(false); releaseAwake(); $('keysbar').classList.remove('on'); showSetup(); }
+function hangup(){ userHungUp=true; pararIdle(); pararReconexao(); reconectando=false; mostrarAvisoReconn(false); try{ var h={type:'hangup'}; if(mySessionId) h.sessionId=mySessionId; wsend(h); }catch(e){} cleanup(false); releaseAwake(); $('keysbar').classList.remove('on'); showSetup(); }
 
 // ---------- reconexao automatica ----------
 function pararReconexao(){ if(reconnTimer){ clearTimeout(reconnTimer); reconnTimer=null; } }
@@ -678,6 +692,7 @@ var wsPrazo=null;
 function pararPrazoWs(){ if(wsPrazo){ clearTimeout(wsPrazo); wsPrazo=null; } }
 function abrirConexao(){
   pararPrazoWs();
+  mySessionId=null;   // cada tentativa recomeca como PRIMARIA; o servidor diz se vira 2a pessoa
   try{ ws=new WebSocket(SERVER); }catch(e){ agendarReconexao(); return; }
   var meu=ws;
   // PRAZO de 10s: um WebSocket pode ficar TRAVADO em "conectando" (tipico ao voltar de outro app
@@ -690,6 +705,39 @@ function abrirConexao(){
   ws.onmessage=function(ev){ var m; try{m=JSON.parse(ev.data);}catch(e){return;} onSig(m); };
   ws.onerror=function(){};
   ws.onclose=function(){ pararPrazoWs(); agendarReconexao(); };
+}
+
+// ---------- mandar uma FOTO/PRINT do celular para o PC ----------
+// Resolve um incomodo real do dono: antes era print -> WhatsApp -> WhatsApp Web no PC -> baixar.
+// Vai pelo mesmo canal de arquivos que o PC ja usa, com um "proposito" proprio: la ele salva em
+// Imagens/AeroDesk E ja deixa a imagem pronta para colar (Ctrl+V).
+var fileCh=null;
+function podeEnviarFoto(){ return fileCh && fileCh.readyState==='open'; }
+$('btnFoto').onclick=function(){
+  if(!podeEnviarFoto()){ vstatus('Conecte-se a um PC antes de enviar a foto.'); setTimeout(function(){vstatus('');},2500); return; }
+  $('fotoInput').click();
+};
+$('fotoInput').onchange=function(){
+  var f=this.files && this.files[0]; this.value='';   // zera p/ poder mandar a MESMA foto de novo
+  if(f) enviarFoto(f);
+};
+async function enviarFoto(f){
+  if(!podeEnviarFoto()){ vstatus('Sem conexao com o PC.'); return; }
+  marcarAtividade();
+  try{
+    fileCh.send(JSON.stringify({type:'file-start', name:f.name||'foto.jpg', size:f.size, purpose:'foto-celular'}));
+    var PEDACO=65536, lidos=0;
+    while(lidos<f.size){
+      // espera o canal esvaziar p/ nao entupir (mesma ideia do PC)
+      while(fileCh.bufferedAmount>2*1024*1024){ await new Promise(function(r){setTimeout(r,30);}); }
+      var buf=await f.slice(lidos, lidos+PEDACO).arrayBuffer();
+      fileCh.send(buf); lidos+=buf.byteLength;
+      vstatus('Enviando foto para o PC... '+Math.round(lidos*100/f.size)+'%');
+    }
+    fileCh.send(JSON.stringify({type:'file-end'}));
+    vstatus('Foto enviada! No PC ela ja esta pronta para colar (Ctrl+V).');
+  }catch(e){ vstatus('Nao consegui enviar a foto: '+e); }
+  setTimeout(function(){ vstatus(''); },4000);
 }
 
 // ---------- manter a tela ligada ----------
@@ -717,7 +765,7 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='17';
+var CELVER='19';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
 function checkVer(){
   if(connected) return;
