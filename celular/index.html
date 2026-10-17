@@ -71,6 +71,7 @@
   #qualityPanel{ position:absolute; left:8px; right:8px; top:calc(env(safe-area-inset-top) + 58px); z-index:6; display:flex; flex-wrap:wrap; align-items:flex-start; gap:6px; pointer-events:none; }
   #qualityInfo{ flex:1; min-width:0; padding:5px 7px; border-radius:7px; background:#000b; color:#fff; font-size:11px; line-height:1.35; }
   #btnSharp{ pointer-events:auto; flex:0 0 auto; max-width:125px; font-size:12px; padding:7px 9px; background:#30364ddd; }
+  #pasteStatus{ display:none; flex-basis:100%; padding:7px 9px; border-radius:8px; background:#20283dee; color:#fff; font-size:13px; }
   /* cursor LOCAL (instantaneo) — ponta no canto superior-esquerdo do elemento */
   #lcur{ position:absolute; width:15px; height:19px; z-index:6; pointer-events:none; display:none; transform-origin:0 0;
     background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 20'%3E%3Cpath d='M0 0 L0 16 L4 12.5 L6.6 18.6 L9 17.6 L6.4 11.5 L12 11.5 Z' fill='white' stroke='black' stroke-width='1.4' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center/contain;
@@ -151,6 +152,7 @@
   <div id="qualityPanel">
     <div id="qualityInfo" role="status" aria-live="polite">Aguardando resolução do vídeo</div>
     <button class="tb" id="btnSharp" title="Pedir a resolução original do PC para ler com zoom">Nitidez para zoom</button>
+    <div id="pasteStatus" role="status" aria-live="polite"></div>
     <div id="dbg"></div>
   </div>
   <div id="topbar">
@@ -347,6 +349,7 @@ async function handleSignal(data){
 }
 
 function setupControl(ch){
+  resetPhonePaste();
   controlCh=ch;
   ch.onopen=function(){
     connected=true; vstatus(''); $('vstatus').style.display='none';
@@ -364,7 +367,7 @@ function setupControl(ch){
       hostCaptureWarning=String(m.aviso||'').slice(0,400); updateQualityInfo();
     }
   };
-  ch.onclose=function(){};
+  ch.onclose=function(){ if(controlCh===ch) resetPhonePaste(); };
 }
 var ATIVIDADE={'mouse-move':1,'mouse-down':1,'mouse-up':1,'wheel':1,'key-down':1,'key-up':1,'text':1}; // so isto e 'mexer'
 function sendInput(o){ if(controlCh&&controlCh.readyState==='open'){ if(ATIVIDADE[o.type]) marcarAtividade(); try{ controlCh.send(JSON.stringify(o)); }catch(e){} } }
@@ -650,6 +653,44 @@ kb.addEventListener('keydown',function(e){
 });
 function tapKey(code,key){ sendInput({type:'key-down',code:code,key:key||code}); sendInput({type:'key-up',code:code,key:key||code}); }
 
+// Leitura somente pelo Ctrl+V existente, durante o toque (permissao do navegador).
+var phonePasteGeneration=0, phonePastePending=null;
+function pasteStatus(text){ var el=$('pasteStatus'); el.textContent=text; el.style.display=text?'block':'none'; }
+function resetPhonePaste(){ phonePasteGeneration++; phonePastePending=null; pasteStatus(''); }
+function pastePhoneText(){
+  if(!connected || reconectando || userHungUp || !controlCh || controlCh.readyState!=='open'){
+    pasteStatus('Aguarde a conexão com o PC antes de colar do celular.'); return;
+  }
+  if(phonePastePending) return;
+  if((typeof isSecureContext!=='undefined' && !isSecureContext) || !navigator.clipboard || typeof navigator.clipboard.readText!=='function'){
+    pasteStatus('A área de transferência do celular não está disponível. Abra o AeroDesk em HTTPS em um navegador compatível.'); return;
+  }
+  var request={channel:controlCh, peer:pc, generation:phonePasteGeneration};
+  phonePastePending=request;
+  function current(){
+    return phonePastePending===request && request.generation===phonePasteGeneration &&
+      request.channel===controlCh && request.peer===pc && connected && !reconectando &&
+      !userHungUp && request.channel.readyState==='open';
+  }
+  function failed(){
+    if(current()) pasteStatus('Não foi possível ler ou enviar o texto do celular. Permita acesso à área de transferência no navegador e toque em Ctrl+V novamente.');
+  }
+  pasteStatus('Aguardando acesso ao texto copiado no celular…');
+  var read;
+  try{ read=navigator.clipboard.readText(); } // nao adiar: preserva o gesto do usuario
+  catch(e){ failed(); if(phonePastePending===request) phonePastePending=null; return; }
+  Promise.resolve(read).then(function(text){
+    if(!current()) return;
+    if(typeof text!=='string' || text.length===0){ pasteStatus('A área de transferência do celular está vazia ou não contém texto. Copie o texto e tente novamente.'); return; }
+    if(text.indexOf('\u0000')!==-1){ pasteStatus('O texto do celular contém um caractere não suportado (NUL). Nada foi enviado.'); return; }
+    var payload=JSON.stringify({type:'text',text:text});
+    if(new TextEncoder().encode(payload).length>16000){ pasteStatus('O texto do celular é muito grande para esta colagem. Copie um trecho menor; nada foi cortado ou enviado.'); return; }
+    // Um unico pedido ordenado: nao disputa escrita de clipboard com um Ctrl+V separado.
+    request.channel.send(payload); marcarAtividade();
+    pasteStatus('Texto do celular enviado ao PC.');
+  }).catch(failed).then(function(){ if(phonePastePending===request) phonePastePending=null; });
+}
+
 // barra de teclas especiais
 var activeMods={};
 $('btnSpecial').onclick=function(){ $('keysbar').classList.toggle('on'); };
@@ -658,6 +699,7 @@ Array.prototype.forEach.call(document.querySelectorAll('#keysbar .kb'),function(
     if(b.dataset.mod){ // modificador: liga/desliga (aplica na proxima tecla/combo)
       var m=b.dataset.mod; activeMods[m]=!activeMods[m]; b.classList.toggle('act',activeMods[m]); return;
     }
+    if(b.dataset.combo==='Control,KeyV'){ pastePhoneText(); return; }
     if(b.dataset.combo){ var parts=b.dataset.combo.split(','); comboKeys(parts); return; }
     if(b.dataset.k){ // tecla simples, com os modificadores ligados (se houver)
       var mods=Object.keys(activeMods).filter(function(m){return activeMods[m];});
@@ -700,6 +742,7 @@ $('btnHang').onclick=hangup;
 function showViewer(){ $('setup').style.display='none'; $('viewer').style.display='flex'; try{ setBarHidden(false); }catch(e){} } // sessao nova sempre COM a barra a vista
 function showSetup(){ $('viewer').style.display='none'; $('setup').style.display='block'; }
 function cleanup(keepScreen){
+  resetPhonePaste();
   connected=false;
   try{ if(hbTimer){clearInterval(hbTimer); hbTimer=null;} }catch(e){}
   try{ if(controlCh) controlCh.close(); }catch(e){} controlCh=null;
@@ -852,7 +895,7 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='21';
+var CELVER='22';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
 function checkVer(){
   if(connected || reconectando || pc || ws) return;
