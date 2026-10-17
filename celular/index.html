@@ -362,8 +362,11 @@ function setupControl(ch){
     keepAwake();
   };
   ch.onmessage=function(ev){
+    if(controlCh!==ch) return;
     var m; try{ m=JSON.parse(ev.data); }catch(e){ return; }
-    if(m && m.type==='cap-nivel'){
+    if(m && m.type==='hello'){ phoneCopySupported=m.copyText===1; }
+    else if(m && m.type==='copy-text-result'){ receivePhoneCopy(m,ch); }
+    else if(m && m.type==='cap-nivel'){
       hostCaptureWarning=String(m.aviso||'').slice(0,400); updateQualityInfo();
     }
   };
@@ -656,8 +659,9 @@ function tapKey(code,key){ sendInput({type:'key-down',code:code,key:key||code});
 // Leitura somente pelo Ctrl+V existente, durante o toque (permissao do navegador).
 var phonePasteGeneration=0, phonePastePending=null;
 function pasteStatus(text){ var el=$('pasteStatus'); el.textContent=text; el.style.display=text?'block':'none'; }
-function resetPhonePaste(){ phonePasteGeneration++; phonePastePending=null; pasteStatus(''); }
+function resetPhonePaste(){ cancelPhoneCopy(); phoneCopySupported=false; phonePasteGeneration++; phonePastePending=null; pasteStatus(''); }
 function pastePhoneText(){
+  cancelPhoneCopy();
   if(!connected || reconectando || userHungUp || !controlCh || controlCh.readyState!=='open'){
     pasteStatus('Aguarde a conexão com o PC antes de colar do celular.'); return;
   }
@@ -691,6 +695,107 @@ function pastePhoneText(){
   }).catch(failed).then(function(){ if(phonePastePending===request) phonePastePending=null; });
 }
 
+// Nunca copia mensagens espontaneas: apenas a resposta ao Ctrl+C desta sessao.
+var phoneCopySupported=false, phoneCopyPending=null, phoneCopySerial=0;
+function copyCurrent(r){
+  return phoneCopyPending===r && r.generation===phonePasteGeneration && r.channel===controlCh &&
+    r.peer===pc && connected && !reconectando && !userHungUp && r.channel.readyState==='open' && !document.hidden &&
+    (typeof document.hasFocus!=='function' || document.hasFocus());
+}
+function cancelPhoneCopy(){
+  var r=phoneCopyPending; phoneCopyPending=null;
+  if(!r) return;
+  clearTimeout(r.timer); r.text='';
+  if(r.reject) { r.reject(new Error('copy-cancelled')); r.reject=null; }
+}
+function failPhoneCopy(r,message){
+  var show=copyCurrent(r);
+  if(phoneCopyPending!==r) return;
+  cancelPhoneCopy(); if(show) pasteStatus(message);
+}
+function copyReady(r){
+  if(!copyCurrent(r)) return;
+  if(Date.now()>=r.expiresAt){ failPhoneCopy(r,'A tentativa de cópia expirou. Toque em Ctrl+C para pedir texto novo ao PC.'); return; }
+  if(!r.readyExpires) r.readyExpires=Date.now()+20000;
+  r.expiresAt=r.readyExpires;
+  if(Date.now()>=r.expiresAt){ failPhoneCopy(r,'O texto recebido do PC expirou. Toque em Ctrl+C para copiar novamente.'); return; }
+  if(typeof navigator.clipboard.writeText!=='function'){
+    failPhoneCopy(r,'O navegador não permitiu copiar no celular. Autorize a área de transferência e tente novamente.'); return;
+  }
+  r.phase='ready'; clearTimeout(r.timer);
+  r.timer=setTimeout(function(){ failPhoneCopy(r,'O texto recebido do PC expirou. Toque em Ctrl+C para copiar novamente.'); },r.expiresAt-Date.now());
+  pasteStatus('Texto recebido do PC. Toque em Ctrl+C novamente para copiar no celular.');
+}
+function copyDone(r){
+  if(!copyCurrent(r) || r.phase!=='writing') return;
+  if(Date.now()>=r.expiresAt){ failPhoneCopy(r,'A confirmação da cópia demorou demais. Verifique a área de transferência do celular.'); return; }
+  cancelPhoneCopy(); pasteStatus('Texto copiado no celular.');
+}
+function copyPcToPhone(){
+  if(!connected || reconectando || userHungUp || !controlCh || controlCh.readyState!=='open' || document.hidden ||
+    (typeof document.hasFocus==='function' && !document.hasFocus())){
+    pasteStatus('Aguarde a conexão com o PC antes de copiar para o celular.'); return;
+  }
+  var previous=phoneCopyPending;
+  if(previous){
+    if(!copyCurrent(previous) || Date.now()>=previous.expiresAt){ cancelPhoneCopy(); }
+    else if(previous.phase==='ready'){
+      previous.phase='writing';
+      try{ Promise.resolve(navigator.clipboard.writeText(previous.text)).then(function(){copyDone(previous);},function(){copyReady(previous);}); }
+      catch(e){ copyReady(previous); }
+      return;
+    } else return;
+  }
+  if(phonePastePending){ pasteStatus('Aguarde terminar a colagem do celular antes de copiar do PC.'); return; }
+  if(!phoneCopySupported){ pasteStatus('Atualize o AeroDesk do PC para copiar texto para o celular.'); return; }
+  var cb;
+  try{ cb=navigator.clipboard; }catch(e){}
+  var items=typeof ClipboardItem==='function' && cb && typeof cb.write==='function';
+  if((typeof isSecureContext!=='undefined' && !isSecureContext) || !cb || (!items && typeof cb.writeText!=='function')){
+    pasteStatus('O navegador não oferece cópia para o celular. Abra em HTTPS e permita a área de transferência.'); return;
+  }
+  var r={channel:controlCh,peer:pc,generation:phonePasteGeneration,
+    id:'mobile-copy-'+phonePasteGeneration+'-'+(++phoneCopySerial)+'-'+Date.now().toString(36),
+    phase:'request',mode:items?'item':'tap',text:'',writeFailed:false,writeDone:false,expiresAt:Date.now()+8000};
+  phoneCopyPending=r;
+  r.timer=setTimeout(function(){ failPhoneCopy(r,'O PC não confirmou a cópia a tempo. Selecione o texto e tente Ctrl+C novamente.'); },8000);
+  pasteStatus('Copiando o texto selecionado no PC para o celular…');
+  if(items){
+    var data=new Promise(function(resolve,reject){r.resolve=resolve;r.reject=reject;});
+    data.catch(function(){});
+    try{
+      // Reserva a escrita DENTRO do toque; Safari nao aceita inicia-la apos a rede.
+      Promise.resolve(cb.write([new ClipboardItem({'text/plain':data})])).then(function(){
+        if(!copyCurrent(r)) return; r.writeDone=true; copyDone(r);
+      },function(){ if(!copyCurrent(r)) return; r.writeFailed=true; if(r.text) copyReady(r); });
+    }catch(e){ r.writeFailed=true; }
+  }
+  try{ r.channel.send(JSON.stringify({type:'copy-text-request',requestId:r.id})); marcarAtividade(); }
+  catch(e){ failPhoneCopy(r,'Não foi possível pedir a cópia ao PC. Verifique a conexão e tente novamente.'); }
+}
+function receivePhoneCopy(m,ch){
+  var r=phoneCopyPending;
+  if(!r || !copyCurrent(r) || ch!==r.channel || m.requestId!==r.id || r.phase!=='request') return;
+  if(Date.now()>=r.expiresAt){ failPhoneCopy(r,'O PC não confirmou a cópia a tempo. Toque em Ctrl+C para tentar novamente.'); return; }
+  if(m.ok!==true){
+    var message=m.code==='sync-disabled'?'Ative copiar/colar no AeroDesk do PC e tente novamente.':
+      'O PC não confirmou texto copiado. Selecione um texto e toque em Ctrl+C novamente.';
+    failPhoneCopy(r,message); return;
+  }
+  if(typeof m.text!=='string' || !m.text.length || m.text.indexOf('\u0000')!==-1 || new TextEncoder().encode(JSON.stringify(m)).length>16000){
+    failPhoneCopy(r,'O texto do PC está vazio, é muito grande ou não é suportado. Nada foi copiado no celular.'); return;
+  }
+  r.text=m.text;
+  r.readyExpires=Date.now()+20000;
+  if(r.mode==='tap' || r.writeFailed){ copyReady(r); return; }
+  r.phase='writing'; r.reject=null;
+  r.resolve(new Blob([r.text],{type:'text/plain'})); r.resolve=null;
+  if(r.writeDone) copyDone(r);
+}
+if(typeof document.addEventListener==='function') document.addEventListener('visibilitychange',function(){
+  if(document.hidden && phoneCopyPending){ cancelPhoneCopy(); pasteStatus('Cópia cancelada porque o celular saiu do AeroDesk.'); }
+});
+
 // barra de teclas especiais
 var activeMods={};
 $('btnSpecial').onclick=function(){ $('keysbar').classList.toggle('on'); };
@@ -700,6 +805,7 @@ Array.prototype.forEach.call(document.querySelectorAll('#keysbar .kb'),function(
       var m=b.dataset.mod; activeMods[m]=!activeMods[m]; b.classList.toggle('act',activeMods[m]); return;
     }
     if(b.dataset.combo==='Control,KeyV'){ pastePhoneText(); return; }
+    if(b.dataset.combo==='Control,KeyC'){ copyPcToPhone(); return; }
     if(b.dataset.combo){ var parts=b.dataset.combo.split(','); comboKeys(parts); return; }
     if(b.dataset.k){ // tecla simples, com os modificadores ligados (se houver)
       var mods=Object.keys(activeMods).filter(function(m){return activeMods[m];});
@@ -895,7 +1001,7 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='22';
+var CELVER='23';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
 function checkVer(){
   if(connected || reconectando || pc || ws) return;
