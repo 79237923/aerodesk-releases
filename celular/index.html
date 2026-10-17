@@ -66,8 +66,11 @@
   #reconnBadge .rdot{ display:inline-block; width:7px; height:7px; border-radius:50%; background:#e8a33d; margin-right:7px; vertical-align:middle; animation:rcp 1s infinite; }
   @keyframes rcp{ 0%,100%{opacity:1} 50%{opacity:.25} }
   #vstatus{ position:absolute; top:50%; left:0; right:0; transform:translateY(-50%); text-align:center; color:#cfd3df; font-size:15px; padding:0 20px; z-index:4; }
-  #dbg{ position:absolute; left:6px; right:6px; top:calc(env(safe-area-inset-top) + 50px); z-index:7; font:11px/1.5 monospace; color:#9f9; background:#000c; padding:7px 9px; border-radius:8px; white-space:pre-wrap; display:none; }
+  #dbg{ position:static; flex-basis:100%; pointer-events:none; font:11px/1.5 monospace; color:#9f9; background:#000c; padding:7px 9px; border-radius:8px; white-space:pre-wrap; display:none; }
   #dbg.on{ display:block; }
+  #qualityPanel{ position:absolute; left:8px; right:8px; top:calc(env(safe-area-inset-top) + 58px); z-index:6; display:flex; flex-wrap:wrap; align-items:flex-start; gap:6px; pointer-events:none; }
+  #qualityInfo{ flex:1; min-width:0; padding:5px 7px; border-radius:7px; background:#000b; color:#fff; font-size:11px; line-height:1.35; }
+  #btnSharp{ pointer-events:auto; flex:0 0 auto; max-width:125px; font-size:12px; padding:7px 9px; background:#30364ddd; }
   /* cursor LOCAL (instantaneo) — ponta no canto superior-esquerdo do elemento */
   #lcur{ position:absolute; width:15px; height:19px; z-index:6; pointer-events:none; display:none; transform-origin:0 0;
     background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 20'%3E%3Cpath d='M0 0 L0 16 L4 12.5 L6.6 18.6 L9 17.6 L6.4 11.5 L12 11.5 Z' fill='white' stroke='black' stroke-width='1.4' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center/contain;
@@ -145,7 +148,11 @@
   <div id="vstatus">Conectando...</div>
   <div id="reconnBadge"><span class="rdot"></span>Conexão caiu — reconectando...</div>
   <div id="idleWarn"></div>
-  <div id="dbg"></div>
+  <div id="qualityPanel">
+    <div id="qualityInfo" role="status" aria-live="polite">Aguardando resolução do vídeo</div>
+    <button class="tb" id="btnSharp" title="Pedir a resolução original do PC para ler com zoom">Nitidez para zoom</button>
+    <div id="dbg"></div>
+  </div>
   <div id="topbar">
     <button class="tb red" id="btnHang">✕ Sair</button>
     <div class="sp"></div>
@@ -192,7 +199,12 @@ function favsGet(){ try{return JSON.parse(get('m_favs','[]'))||[];}catch(e){retu
 function favsSet(a){ set('m_favs',JSON.stringify(a)); }
 var SERVER=get('m_server',DEF_SERVER);
 var LICENSE=get('m_license','');
-var QUALITY=get('m_quality3','nitido'); // resolucao CHEIA: e o que permite LER com zoom (720p ja chega reduzido do PC e o zoom so amplia o borrao). Chave nova p/ migrar quem ja tinha escolha salva.
+// A chave antiga misturava escolha com queda automatica permanente. Migra uma vez
+// para nitido sem apagar a chave antiga; escolhas explicitas novas continuam salvas.
+var QUALITY=get('m_quality4','nitido');
+if(['nitido','equilibrado','fluido'].indexOf(QUALITY)<0) QUALITY='nitido';
+var sessionQuality=QUALITY, qualityWarning='', hostCaptureWarning='';
+var receivedWidth=0, receivedHeight=0;
 var MYID='';
 
 // ---------- utils de licenca (extrai o ID de dentro da chave) ----------
@@ -224,7 +236,8 @@ function refreshCfg(){
 $('btnSaveCfg').onclick=function(){
   LICENSE=$('lic').value.trim(); SERVER=($('srv').value.trim()||DEF_SERVER); QUALITY=$('qual').value;
   SENS=parseFloat($('sens').value)||1.4;
-  set('m_license',LICENSE); set('m_server',SERVER); set('m_quality3',QUALITY); set('m_sens',String(SENS));
+  set('m_license',LICENSE); set('m_server',SERVER); set('m_quality4',QUALITY); set('m_sens',String(SENS));
+  if(!connected) sessionQuality=QUALITY;
   refreshCfg(); $('err').textContent='Configurações salvas.'; $('err').style.color='var(--green)';
 };
 $('lic').addEventListener('input',function(){ $('licinfo').textContent=licInfo($('lic').value.trim()); });
@@ -276,6 +289,8 @@ function doConnect(){
   userHungUp=false; reconnTries=0; mySessionId=null; pararReconexao(); reconectando=false; mostrarAvisoReconn(false);
   marcarAtividade(); ligarIdle();
   cleanup(true);
+  sessionQuality=QUALITY; quedaAuto=false; qualityWarning=''; hostCaptureWarning='';
+  receivedWidth=0; receivedHeight=0; updateQualityInfo();
   try{ ws=new WebSocket(SERVER); }catch(e){ vstatus('Falha ao abrir o servidor.'); return; }
   ws.onopen=function(){ vstatus('Conectando ao PC '+target+'...'); wsend({type:'connect', target:target, password:password, license:LICENSE, fromId:MYID}); };
   ws.onmessage=function(ev){ var m; try{m=JSON.parse(ev.data);}catch(e){return;} onSig(m); };
@@ -336,14 +351,19 @@ function setupControl(ch){
   ch.onopen=function(){
     connected=true; vstatus(''); $('vstatus').style.display='none';
     sendInput({type:'hello', build:'mobile'});
-    sendInput({type:'quality', mode:QUALITY});
+    sendInput({type:'quality', mode:sessionQuality});
     sendInput({type:'cursor-mode', drawCursor:false, watch:false}); // sem ponteiro no video: mostro o cursor LOCAL (instantaneo)
     cursorX=0.5; cursorY=0.5; resetZoom(); drawLocalCursor();
     if(hbTimer) clearInterval(hbTimer);
     hbTimer=setInterval(function(){ sendInput({type:'mouse-state', buttons:heldButtons}); }, 150);
     keepAwake();
   };
-  ch.onmessage=function(){};
+  ch.onmessage=function(ev){
+    var m; try{ m=JSON.parse(ev.data); }catch(e){ return; }
+    if(m && m.type==='cap-nivel'){
+      hostCaptureWarning=String(m.aviso||'').slice(0,400); updateQualityInfo();
+    }
+  };
   ch.onclose=function(){};
 }
 var ATIVIDADE={'mouse-move':1,'mouse-down':1,'mouse-up':1,'wheel':1,'key-down':1,'key-up':1,'text':1}; // so isto e 'mexer'
@@ -390,7 +410,11 @@ function vDrawLoop(){
   while(frameQueue.length && (vClock0+(frameQueue[0].timestamp-vTs0)/1000)<=now){ if(toDraw){try{toDraw.close();}catch(e){}} toDraw=frameQueue.shift(); }
   while(frameQueue.length>V_MAX){ var f=frameQueue.shift(); try{f.close();}catch(e){} vClock0=0; }
   if(vClock0===0&&frameQueue.length){ vClock0=now; vTs0=frameQueue[0].timestamp; }
-  if(toDraw){ if(canvas.width!==toDraw.displayWidth){ canvas.width=toDraw.displayWidth; canvas.height=toDraw.displayHeight; } try{ cctx.drawImage(toDraw,0,0); }catch(e){} try{ toDraw.close(); }catch(e){} }
+  if(toDraw){
+    if(canvas.width!==toDraw.displayWidth || canvas.height!==toDraw.displayHeight){ canvas.width=toDraw.displayWidth; canvas.height=toDraw.displayHeight; }
+    try{ cctx.drawImage(toDraw,0,0); receivedWidth=toDraw.displayWidth; receivedHeight=toDraw.displayHeight; updateQualityInfo(); }catch(e){}
+    try{ toDraw.close(); }catch(e){}
+  }
   if(frameQueue.length===0) vPlaying=false;
 }
 function setupVideo(ch){
@@ -411,20 +435,42 @@ function startDbg(){
     else if(vFrames>0 && secs>6) d.classList.remove('on');  // funcionou -> some
     // Chegou video mas o aparelho NAO decodificou nada em 8s? Provavelmente ele nao da conta da
     // resolucao cheia. Cai p/ 720p sozinho (uma vez so) em vez de deixar a pessoa na tela preta.
-    if(!quedaAuto && QUALITY==='nitido' && vBytes>50000 && vFrames===0 && secs>=8) quedaAutoQualidade();
+    if(!quedaAuto && sessionQuality==='nitido' && vBytes>50000 && vFrames===0 && secs>=8) quedaAutoQualidade();
   },1000);
 }
 var quedaAuto=false; // so tenta uma vez por sessao
 function quedaAutoQualidade(){
   quedaAuto=true;
-  QUALITY='equilibrado'; set('m_quality3',QUALITY);
-  try{ $('qual').value=QUALITY; }catch(e){}
-  sendInput({type:'quality', mode:QUALITY});
+  sessionQuality='equilibrado'; // SOMENTE esta sessao; nunca substitui a preferencia escolhida
+  sendInput({type:'quality', mode:sessionQuality});
   vResetDecoder(); vBytes=0; vFrames=0; vErr='';
-  vstatus('Este aparelho não deu conta da resolução cheia — mudei para 720p.');
+  qualityWarning='Sem quadros decodificados: redução temporária para 720p. Use Nitidez para zoom para tentar novamente.';
+  updateQualityInfo(); vstatus('Redução temporária para 720p; sua preferência de qualidade foi preservada.');
   setTimeout(function(){ vstatus(''); },4000);
 }
 function stopDbg(){ if(vDbgTimer){ clearInterval(vDbgTimer); vDbgTimer=null; } var d=$('dbg'); if(d){ d.classList.remove('on'); d.textContent=''; } }
+
+function requestNativeQuality(persist){
+  if(persist){ QUALITY='nitido'; set('m_quality4',QUALITY); $('qual').value=QUALITY; }
+  sessionQuality='nitido'; quedaAuto=false; qualityWarning='';
+  sendInput({type:'quality', mode:sessionQuality});
+  vResetDecoder(); vBytes=0; vFrames=0; vErr='';
+  if(videoCh) startDbg(); // prazo NOVO de oito segundos, nao o relogio da tentativa anterior
+  updateQualityInfo();
+}
+function updateQualityInfo(){
+  var el=$('qualityInfo'); if(!el) return;
+  var parts=[receivedWidth && receivedHeight ? receivedWidth+'×'+receivedHeight+' recebidos' : 'Aguardando resolução do vídeo'];
+  parts.push(sessionQuality==='nitido'?'Pedido: resolução nativa':sessionQuality==='equilibrado'?'Pedido: 720p':'Pedido: 540p');
+  if(qualityWarning) parts.push(qualityWarning);
+  if(hostCaptureWarning) parts.push(hostCaptureWarning);
+  if(receivedWidth && zoom>1.05){
+    var vd=videoDisp(), pixels=vd.cw*zoom*(window.devicePixelRatio||1);
+    if(pixels>receivedWidth*1.05) parts.push('Limite dos pixels recebidos: ampliar mais não cria detalhes.');
+  }
+  var text=parts.join(' · '); if(el.textContent!==text) el.textContent=text;
+}
+$('btnSharp').onclick=function(){ marcarAtividade(); requestNativeQuality(true); };
 
 // ============ CONTROLE POR TOQUE — estilo TRACKPAD (igual AnyDesk) ============
 // Arrastar o dedo move o cursor RELATIVO (como o touchpad do notebook); toque=clique
@@ -434,7 +480,7 @@ var heldButtons=0, lastMove=0;
 var cursorX=0.5, cursorY=0.5, SENS=parseFloat(get('m_sens','1.4'))||1.4;
 var lcur=$('lcur'), vp=$('vp');
 var zoom=1, panX=0, panY=0; // zoom/pan da tela (gesto de pinca)
-function applyVp(){ if(vp) vp.style.transform='translate('+panX+'px,'+panY+'px) scale('+zoom+')'; }
+function applyVp(){ if(vp) vp.style.transform='translate('+panX+'px,'+panY+'px) scale('+zoom+')'; updateQualityInfo(); }
 function resetZoom(){ zoom=1; panX=0; panY=0; applyVp(); }
 // TECLADO DO CELULAR: quando ele abre, cobre a parte de baixo da tela — inclusive o lugar onde
 // voce esta digitando no PC. O `visualViewport` diz QUANTO ficou coberto; guardamos em kbInset e
@@ -497,7 +543,7 @@ var single=null, downTime=0, moved=0, dragging=false, dragArmed=false, lastTap=0
 canvas.addEventListener('touchstart',function(e){
   e.preventDefault();
   if(e.touches.length===2){
-    var md=tMid(e.touches); two={ d:tDist(e.touches), mx:md.x, my:md.y, moved:false, time:Date.now() }; single=null; clearTimeout(longTimer);
+    var md=tMid(e.touches); two={ d:tDist(e.touches), mx:md.x, my:md.y, moved:false, time:Date.now(), qualityRequested:false }; single=null; clearTimeout(longTimer);
     if(dragging){ sendInput({type:'mouse-up',button:0,x:cursorX,y:cursorY}); dragging=false; heldButtons=0; } dragArmed=false;
     return;
   }
@@ -517,6 +563,8 @@ canvas.addEventListener('touchmove',function(e){
     } else { // PINCA + PAN (mantem o ponto entre os dedos fixo)
       two.moved=true;
       var z2=Math.max(1,Math.min(4, zoom*ratio)), sc=z2/zoom;
+      // Um pedido por gesto, nao por movimento: evita religar o encoder a cada frame.
+      if(z2>1.05 && !two.qualityRequested){ two.qualityRequested=true; if(sessionQuality!=='nitido') requestNativeQuality(false); }
       panX=m2.x-(two.mx-panX)*sc; panY=m2.y-(two.my-panY)*sc; zoom=z2; clampPan(); applyVp(); drawLocalCursor(); marcarAtividade();
     }
     two.d=d2; two.mx=m2.x; two.my=m2.y; return;
@@ -618,10 +666,16 @@ Array.prototype.forEach.call(document.querySelectorAll('#keysbar .kb'),function(
     }
   });
 });
-function codeForMod(m){ return m==='Control'?'ControlLeft':m==='Alt'?'AltLeft':m==='Meta'?'MetaLeft':'ShiftLeft'; }
-function keyForCode(c){ var map={Enter:'Enter',Backspace:'Backspace',Tab:'Tab',Escape:'Escape',ArrowLeft:'ArrowLeft',ArrowRight:'ArrowRight',ArrowUp:'ArrowUp',ArrowDown:'ArrowDown'}; return map[c]||c; }
+function codeForMod(m){ var map={Control:'ControlLeft',Alt:'AltLeft',Meta:'MetaLeft',Shift:'ShiftLeft'}; return map[m]||m; }
+function keyForCode(c){
+  var map={ControlLeft:'Control',ControlRight:'Control',AltLeft:'Alt',AltRight:'Alt',
+    ShiftLeft:'Shift',ShiftRight:'Shift',MetaLeft:'Meta',MetaRight:'Meta',
+    Enter:'Enter',Backspace:'Backspace',Tab:'Tab',Escape:'Escape',ArrowLeft:'ArrowLeft',ArrowRight:'ArrowRight',ArrowUp:'ArrowUp',ArrowDown:'ArrowDown'};
+  return /^Key[A-Z]$/.test(c)?c.slice(3).toLowerCase():map[c]||c;
+}
 function clearMods(){ activeMods={}; Array.prototype.forEach.call(document.querySelectorAll('#keysbar .act-toggle'),function(b){b.classList.remove('act');}); }
 function comboKeys(codes){ // segura todos, solta na ordem inversa
+  codes=codes.map(codeForMod); // botoes predefinidos tambem precisam dos codigos fisicos
   for(var i=0;i<codes.length;i++) sendInput({type:'key-down',code:codes[i],key:keyForCode(codes[i])});
   for(var j=codes.length-1;j>=0;j--) sendInput({type:'key-up',code:codes[j],key:keyForCode(codes[j])});
 }
@@ -798,11 +852,12 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='20';
+var CELVER='21';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
 function checkVer(){
-  if(connected) return;
+  if(connected || reconectando || pc || ws) return;
   fetch('ver.txt?cb='+Date.now(),{cache:'no-store'}).then(function(r){return r.text();}).then(function(t){
+    if(connected || reconectando || pc || ws) return; // inclui a negociacao antes de abrir o canal
     t=(t||'').trim(); if(t && t!==CELVER){ try{location.reload(true);}catch(e){location.reload();} }
   }).catch(function(){});
 }
