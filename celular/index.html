@@ -69,8 +69,7 @@
   #dbg{ position:static; flex-basis:100%; pointer-events:none; font:11px/1.5 monospace; color:#9f9; background:#000c; padding:7px 9px; border-radius:8px; white-space:pre-wrap; display:none; }
   #dbg.on{ display:block; }
   #qualityPanel{ position:absolute; left:8px; right:8px; top:calc(env(safe-area-inset-top) + 58px); z-index:6; display:flex; flex-wrap:wrap; align-items:flex-start; gap:6px; pointer-events:none; }
-  #qualityInfo{ flex:1; min-width:0; padding:5px 7px; border-radius:7px; background:#000b; color:#fff; font-size:11px; line-height:1.35; }
-  #btnSharp{ pointer-events:auto; flex:0 0 auto; max-width:125px; font-size:12px; padding:7px 9px; background:#30364ddd; }
+  #qualityInfo{ display:none; flex:1; min-width:0; padding:5px 7px; border-radius:7px; background:#000b; color:#fff; font-size:11px; line-height:1.35; }
   #pasteStatus{ display:none; flex-basis:100%; padding:7px 9px; border-radius:8px; background:#20283dee; color:#fff; font-size:13px; }
   /* cursor LOCAL (instantaneo) — ponta no canto superior-esquerdo do elemento */
   #lcur{ position:absolute; width:15px; height:19px; z-index:6; pointer-events:none; display:none; transform-origin:0 0;
@@ -150,8 +149,7 @@
   <div id="reconnBadge"><span class="rdot"></span>Conexão caiu — reconectando...</div>
   <div id="idleWarn"></div>
   <div id="qualityPanel">
-    <div id="qualityInfo" role="status" aria-live="polite">Aguardando resolução do vídeo</div>
-    <button class="tb" id="btnSharp" title="Pedir a resolução original do PC para ler com zoom">Nitidez para zoom</button>
+    <div id="qualityInfo" role="status" aria-live="polite"></div>
     <div id="pasteStatus" role="status" aria-live="polite"></div>
     <div id="dbg"></div>
   </div>
@@ -450,7 +448,7 @@ function quedaAutoQualidade(){
   sessionQuality='equilibrado'; // SOMENTE esta sessao; nunca substitui a preferencia escolhida
   sendInput({type:'quality', mode:sessionQuality});
   vResetDecoder(); vBytes=0; vFrames=0; vErr='';
-  qualityWarning='Sem quadros decodificados: redução temporária para 720p. Use Nitidez para zoom para tentar novamente.';
+  qualityWarning='Vídeo temporariamente reduzido. Amplie com dois dedos para tentar a qualidade original novamente.';
   updateQualityInfo(); vstatus('Redução temporária para 720p; sua preferência de qualidade foi preservada.');
   setTimeout(function(){ vstatus(''); },4000);
 }
@@ -466,17 +464,12 @@ function requestNativeQuality(persist){
 }
 function updateQualityInfo(){
   var el=$('qualityInfo'); if(!el) return;
-  var parts=[receivedWidth && receivedHeight ? receivedWidth+'×'+receivedHeight+' recebidos' : 'Aguardando resolução do vídeo'];
-  parts.push(sessionQuality==='nitido'?'Pedido: resolução nativa':sessionQuality==='equilibrado'?'Pedido: 720p':'Pedido: 540p');
+  var parts=[];
   if(qualityWarning) parts.push(qualityWarning);
   if(hostCaptureWarning) parts.push(hostCaptureWarning);
-  if(receivedWidth && zoom>1.05){
-    var vd=videoDisp(), pixels=vd.cw*zoom*(window.devicePixelRatio||1);
-    if(pixels>receivedWidth*1.05) parts.push('Limite dos pixels recebidos: ampliar mais não cria detalhes.');
-  }
   var text=parts.join(' · '); if(el.textContent!==text) el.textContent=text;
+  el.style.display=text?'block':'none';
 }
-$('btnSharp').onclick=function(){ marcarAtividade(); requestNativeQuality(true); };
 
 // ============ CONTROLE POR TOQUE — estilo TRACKPAD (igual AnyDesk) ============
 // Arrastar o dedo move o cursor RELATIVO (como o touchpad do notebook); toque=clique
@@ -1001,7 +994,7 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='23';
+var CELVER='24';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
 function checkVer(){
   if(connected || reconectando || pc || ws) return;
