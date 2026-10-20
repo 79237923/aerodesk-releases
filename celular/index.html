@@ -66,8 +66,6 @@
   #reconnBadge .rdot{ display:inline-block; width:7px; height:7px; border-radius:50%; background:#e8a33d; margin-right:7px; vertical-align:middle; animation:rcp 1s infinite; }
   @keyframes rcp{ 0%,100%{opacity:1} 50%{opacity:.25} }
   #vstatus{ position:absolute; top:50%; left:0; right:0; transform:translateY(-50%); text-align:center; color:#cfd3df; font-size:15px; padding:0 20px; z-index:4; }
-  #dbg{ position:static; flex-basis:100%; pointer-events:none; font:11px/1.5 monospace; color:#9f9; background:#000c; padding:7px 9px; border-radius:8px; white-space:pre-wrap; display:none; }
-  #dbg.on{ display:block; }
   #qualityPanel{ position:absolute; left:8px; right:8px; top:calc(env(safe-area-inset-top) + 58px); z-index:6; display:flex; flex-wrap:wrap; align-items:flex-start; gap:6px; pointer-events:none; }
   #qualityInfo{ display:none; flex:1; min-width:0; padding:5px 7px; border-radius:7px; background:#000b; color:#fff; font-size:11px; line-height:1.35; }
   #pasteStatus{ display:none; flex-basis:100%; padding:7px 9px; border-radius:8px; background:#20283dee; color:#fff; font-size:13px; }
@@ -151,7 +149,6 @@
   <div id="qualityPanel">
     <div id="qualityInfo" role="status" aria-live="polite"></div>
     <div id="pasteStatus" role="status" aria-live="polite"></div>
-    <div id="dbg"></div>
   </div>
   <div id="topbar">
     <button class="tb red" id="btnHang">✕ Sair</button>
@@ -432,11 +429,7 @@ function startDbg(){
   if(vDbgTimer) clearInterval(vDbgTimer);
   var t0=Date.now();
   vDbgTimer=setInterval(function(){
-    var d=$('dbg'); if(!d) return;
     var secs=((Date.now()-t0)/1000)|0;
-    d.textContent='diagnóstico · vídeo recebido: '+((vBytes/1024)|0)+' KB · codec: '+(vCfg||'—')+' · quadros: '+vFrames+(vErr?('\nERRO: '+vErr):'');
-    if(vFrames===0 && secs>=3) d.classList.add('on');       // tela preta -> mostra o diagnostico
-    else if(vFrames>0 && secs>6) d.classList.remove('on');  // funcionou -> some
     // Chegou video mas o aparelho NAO decodificou nada em 8s? Provavelmente ele nao da conta da
     // resolucao cheia. Cai p/ 720p sozinho (uma vez so) em vez de deixar a pessoa na tela preta.
     if(!quedaAuto && sessionQuality==='nitido' && vBytes>50000 && vFrames===0 && secs>=8) quedaAutoQualidade();
@@ -452,7 +445,7 @@ function quedaAutoQualidade(){
   updateQualityInfo(); vstatus('Redução temporária para 720p; sua preferência de qualidade foi preservada.');
   setTimeout(function(){ vstatus(''); },4000);
 }
-function stopDbg(){ if(vDbgTimer){ clearInterval(vDbgTimer); vDbgTimer=null; } var d=$('dbg'); if(d){ d.classList.remove('on'); d.textContent=''; } }
+function stopDbg(){ if(vDbgTimer){ clearInterval(vDbgTimer); vDbgTimer=null; } }
 
 function requestNativeQuality(persist){
   if(persist){ QUALITY='nitido'; set('m_quality4',QUALITY); $('qual').value=QUALITY; }
