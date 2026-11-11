@@ -11,8 +11,8 @@
 <link rel="preload" href="../fonts/figtree-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="../fonts/cormorant-garamond-500.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon.png">
-<link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" href="icon-maskable.png">
+<link rel="icon" type="image/png" href="../favicon.png">
 <title>AeroDesk — Celular</title>
 <style>
   /* =====================================================================
@@ -147,10 +147,12 @@
 <div id="setup">
   <header class="topo">
     <div class="topo-in">
-      <!-- Marca provisoria: anel dourado com a inicial (a mesma do app de computador), ate o icone novo ser escolhido. -->
-      <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true">
-        <circle cx="32" cy="32" r="29" fill="none" stroke="#C9A961" stroke-width="2.5"/>
-        <text x="32" y="44" font-family="Cormorant Garamond, Georgia, serif" font-size="36" font-weight="600" fill="#DCC08A" text-anchor="middle">A</text>
+      <!-- Marca: monograma AD (icone escolhido pelo dono em 2026-11-11). Letras em contorno: nao dependem de fonte. -->
+      <svg width="28" height="28" viewBox="0 0 256 256" aria-hidden="true">
+        <rect x="9" y="9" width="238" height="238" rx="56" fill="none" stroke="#C9A961" stroke-width="9"/>
+        <g transform="translate(128 128) scale(1.16) translate(-120 -128.5)"><path transform="translate(97.13 176) scale(0.15 -0.15)" d="M326 -4Q294 -4 246 -1Q198 2 158 2Q122 2 89 1Q56 0 30 0Q28 0 28 6Q28 12 30 12Q61 12 76.5 17Q92 22 97.5 37Q103 52 103 81L103 544Q103 573 98 587.5Q93 602 77.5 607.5Q62 613 32 613Q29 613 29 619Q29 625 32 625Q58 625 90 623.5Q122 622 159 622Q195 622 238 624.5Q281 627 312 627Q416 627 493 587Q570 547 613 478Q656 409 656 323Q656 248 630 187.5Q604 127 558 84.5Q512 42 452.5 19Q393 -4 326 -4ZM316 19Q379 19 428 51.5Q477 84 505 147Q533 210 533 301Q533 386 507 455Q481 524 434 564.5Q387 605 322 605Q264 605 239 594Q214 583 214 542L214 92Q214 55 233.5 37Q253 19 316 19Z" fill="#B08D3E"/>
+        <path transform="translate(45.30 176) scale(0.15 -0.15)" d="M171 229L186 257L474 257L481 229ZM717 12Q722 12 722 6Q722 0 717 0Q687 0 654.5 2Q622 4 592 4Q558 4 533 2Q508 0 477 0Q473 0 473 6Q473 12 477 12Q518 12 524.5 28.5Q531 45 506 94L303 495L352 581L153 142Q126 82 152 47Q178 12 234 12Q239 12 239 6Q239 0 234 0Q204 0 179 2Q154 4 116 4Q77 4 53.5 2Q30 0 -4 0Q-8 0 -8 6Q-8 12 -4 12Q23 12 42.5 23.5Q62 35 81.5 65.5Q101 96 126 152L343 629Q344 632 352 632.5Q360 633 361 629L611 137Q635 90 652.5 62.5Q670 35 685.5 23.5Q701 12 717 12Z" fill="#1C1712" stroke="#1C1712" stroke-width="66.7" stroke-linejoin="round"/>
+        <path transform="translate(45.30 176) scale(0.15 -0.15)" d="M171 229L186 257L474 257L481 229ZM717 12Q722 12 722 6Q722 0 717 0Q687 0 654.5 2Q622 4 592 4Q558 4 533 2Q508 0 477 0Q473 0 473 6Q473 12 477 12Q518 12 524.5 28.5Q531 45 506 94L303 495L352 581L153 142Q126 82 152 47Q178 12 234 12Q239 12 239 6Q239 0 234 0Q204 0 179 2Q154 4 116 4Q77 4 53.5 2Q30 0 -4 0Q-8 0 -8 6Q-8 12 -4 12Q23 12 42.5 23.5Q62 35 81.5 65.5Q101 96 126 152L343 629Q344 632 352 632.5Q360 633 361 629L611 137Q635 90 652.5 62.5Q670 35 685.5 23.5Q701 12 717 12Z" fill="#E6CD9A"/></g>
       </svg>
       <span class="topo-nome">AeroDesk</span>
       <span class="topo-tag">no celular</span>
@@ -1054,7 +1056,7 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='26';
+var CELVER='27';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
 function formularioEmEdicao(){
   var el=document.activeElement;
