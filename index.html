@@ -3,55 +3,80 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1C1712" />
   <title>AeroDesk — Download</title>
+  <link rel="preload" href="fonts/figtree-400.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="fonts/cormorant-garamond-500.woff2" as="font" type="font/woff2" crossorigin />
   <style>
+    /* =====================================================================
+       PADRAO VISUAL HRF (o mesmo do app de computador e do Sistema HRF).
+       Fundo creme, faixa escura "tinta", dourado como destaque.
+       Titulos: Cormorant Garamond · Texto: Figtree · Numeros: IBM Plex Serif.
+       As fontes sao servidas por este proprio site (pasta fonts/). Se o arquivo
+       faltar, o texto cai calado na fonte do aparelho: nao da erro.
+       ===================================================================== */
+    @font-face { font-family: "Cormorant Garamond"; font-style: normal; font-weight: 500 700; font-display: swap; src: url("fonts/cormorant-garamond-500.woff2") format("woff2"); }
+    @font-face { font-family: "Figtree"; font-style: normal; font-weight: 400 700; font-display: swap; src: url("fonts/figtree-400.woff2") format("woff2"); }
+    @font-face { font-family: "IBM Plex Serif"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/ibm-plex-serif-600.woff2") format("woff2"); }
     :root {
-      --bg: #15171b; --panel: #1c1f26; --panel2: #22252e; --border: #2a2e38;
-      --text: #e8eaf0; --muted: #9aa0ad; --accent: #6a6fa6; --accent2: #868cc2;
-      --green: #3fbf6f; --red: #e0625e;
+      --cream-50: #FAF8F4; --cream-100: #F4EFE6; --cream-200: #E8E0D0; --cream-300: #D9CDB6;
+      --ink-950: #1C1712; --ink-900: #262019; --ink-800: #3A322A; --ink-600: #6B6157; --ink-400: #9A9086;
+      --gold-300: #DCC08A; --gold-400: #C9A961; --gold-500: #B08D3E; --gold-600: #8F7130;
+      --font-display: "Cormorant Garamond", Georgia, serif;
+      --font-sans: "Figtree", "Segoe UI", system-ui, sans-serif;
+      --font-valor: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+      --green: #047857; --red: #b91c1c;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--bg); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.55; }
-    .wrap { max-width: 880px; margin: 0 auto; padding: 40px 20px 60px; }
+    body { background: var(--cream-50); color: var(--ink-900); font-family: var(--font-sans); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+    b, strong { font-weight: 600; }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 0 20px 60px; }
 
-    /* Cabecalho */
-    .brand { display: flex; align-items: center; gap: 12px; justify-content: center; margin-bottom: 6px; }
-    .brand svg { width: 42px; height: 42px; }
-    .brand h1 { font-size: 30px; letter-spacing: .3px; }
-    .tagline { text-align: center; color: var(--muted); margin-bottom: 34px; font-size: 15px; }
+    /* Faixa escura do topo com a marca */
+    .hero { background: var(--ink-950); text-align: center; padding: 46px 20px 104px; }
+    .hero-rotulo { font-size: 11px; font-weight: 500; letter-spacing: .28em; text-transform: uppercase; color: var(--gold-400); margin-bottom: 14px; }
+    .brand { display: flex; align-items: center; gap: 14px; justify-content: center; margin-bottom: 10px; }
+    .brand svg { width: 50px; height: 50px; flex: 0 0 auto; }
+    .brand h1 { font-family: var(--font-display); font-size: clamp(42px, 9vw, 58px); font-weight: 600; line-height: 1; letter-spacing: .3px; color: var(--cream-50); }
+    .tagline { color: rgba(244,239,230,.72); font-size: 16px; }
 
-    /* Bloco de download */
-    .dl-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 34px 26px; text-align: center; margin-bottom: 14px; }
-    .btn-dl { display: inline-block; background: var(--accent); color: #fff; text-decoration: none; font-size: 19px; font-weight: 600; padding: 16px 42px; border-radius: 12px; transition: background .15s; }
-    .btn-dl:hover { background: var(--accent2); }
+    /* Bloco de download (cartao branco que "sobe" sobre a faixa escura) */
+    .dl-card { position: relative; margin-top: -64px; background: #fff; border: 1px solid var(--cream-200); border-radius: 14px; padding: 34px 26px 28px; text-align: center; box-shadow: 0 18px 50px rgba(28,23,18,.16); }
+    .btn-dl { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 54px; background: var(--gold-500); color: #fff; text-decoration: none; font-size: 17px; font-weight: 600; padding: 14px 34px; border: 1px solid transparent; border-radius: 8px; transition: background .15s; }
+    .btn-dl:hover { background: var(--gold-600); }
+    .btn-dl svg, .btn-mac svg { width: 20px; height: 20px; flex: 0 0 auto; }
+    .btn-dl svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .btn-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-    .btn-mac { display: none; align-items: center; gap: 10px; background: var(--panel2); border: 1px solid var(--accent); color: var(--text); text-decoration: none; font-size: 19px; font-weight: 600; padding: 15px 36px; border-radius: 12px; transition: background .15s; }
-    .btn-mac:hover { background: var(--accent); color: #fff; }
-    .btn-mac svg { width: 20px; height: 20px; flex: 0 0 auto; }
-    .dl-meta { margin-top: 12px; color: var(--muted); font-size: 13px; }
-    .dl-alt { margin-top: 16px; font-size: 13px; }
-    .dl-alt a { color: var(--accent2); }
+    .btn-mac { display: none; align-items: center; justify-content: center; gap: 10px; min-height: 54px; background: #fff; border: 1px solid var(--cream-300); color: var(--ink-800); text-decoration: none; font-size: 17px; font-weight: 600; padding: 14px 30px; border-radius: 8px; transition: border-color .15s, color .15s; }
+    .btn-mac:hover { border-color: var(--gold-500); color: var(--gold-600); }
+    .dl-meta { margin-top: 14px; color: var(--ink-600); font-size: 13px; }
+    .dl-alt { margin-top: 14px; font-size: 13.5px; color: var(--ink-600); }
+    /* A folga invisivel deixa o link facil de tocar no celular sem mexer no desenho. */
+    .dl-alt a { display: inline-block; padding: 13px 3px; margin: -13px -3px; color: var(--gold-600); font-weight: 600; text-underline-offset: 3px; }
+    .dl-alt a:hover { color: var(--gold-500); }
     #macIntelRow { display: none; }
-    .note-pc { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+    .note-pc { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--cream-200); font-size: 12.5px; color: var(--ink-400); }
+
+    /* Titulos de secao */
+    h2 { font-family: var(--font-display); font-variant-numeric: lining-nums; font-size: 30px; font-weight: 600; line-height: 1.15; color: var(--ink-900); margin: 46px 0 16px; }
 
     /* Passos */
-    h2 { font-size: 20px; margin: 40px 0 16px; }
     .steps { list-style: none; counter-reset: st; }
-    .steps li { counter-increment: st; display: flex; gap: 14px; align-items: flex-start; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; font-size: 15px; }
-    .steps li::before { content: counter(st); flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+    .steps li { counter-increment: st; display: flex; gap: 14px; align-items: flex-start; background: #fff; border: 1px solid var(--cream-200); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; font-size: 15px; color: var(--ink-800); }
+    .steps li::before { content: counter(st); flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; background: var(--ink-950); border: 1px solid rgba(201,169,97,.70); color: var(--gold-300); font-family: var(--font-valor); font-feature-settings: "tnum" 1; font-weight: 600; display: flex; align-items: center; justify-content: center; font-size: 14px; margin-top: -2px; }
     .steps li > span { flex: 1; }
-    .steps b { color: #fff; }
+    .steps b { color: var(--ink-900); }
 
     /* Aviso do Windows (explicacao) */
-    .warnbox { background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 12px; padding: 16px 18px; margin: 14px 0 22px; font-size: 14.5px; color: var(--muted); }
-    .warnbox b { color: var(--text); }
+    .warnbox { background: #fff; border: 1px solid var(--cream-200); border-left: 3px solid var(--gold-400); border-radius: 12px; padding: 16px 18px; margin: 14px 0 22px; font-size: 14.5px; color: var(--ink-600); }
+    .warnbox b { color: var(--ink-900); }
 
-    /* Maquetes da tela do SmartScreen */
+    /* Maquetes da tela do SmartScreen (imitam a tela REAL do Windows: por isso seguem vermelhas e em Segoe UI) */
     .mocks { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
     @media (max-width: 720px) { .mocks { grid-template-columns: 1fr; } }
-    .mock-label { text-align: center; font-size: 14px; color: var(--muted); margin-bottom: 8px; }
-    .mock-label b { color: var(--text); }
-    .mock { position: relative; background: #a4262c; border-radius: 10px; padding: 22px 20px 20px; color: #fff; min-height: 240px; box-shadow: 0 10px 30px rgba(0,0,0,.45); overflow: hidden; }
+    .mock-label { text-align: center; font-size: 14px; color: var(--ink-600); margin-bottom: 8px; }
+    .mock-label b { color: var(--ink-900); }
+    .mock { position: relative; background: #a4262c; border-radius: 10px; padding: 22px 20px 20px; color: #fff; min-height: 240px; box-shadow: 0 10px 30px rgba(28,23,18,.28); overflow: hidden; font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.55; }
     .mock .x { position: absolute; top: 10px; right: 10px; background: #fff; color: #111; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 13px; border-radius: 2px; }
     .mock h3 { font-size: 21px; font-weight: 600; margin-bottom: 12px; }
     .mock p { font-size: 13px; color: #ffd9d6; margin-bottom: 10px; }
@@ -62,34 +87,51 @@
 
     /* Destaque (anel pulsante + numero) */
     .hl { position: relative; }
-    .hl::after { content: ""; position: absolute; inset: -7px -10px; border: 3px solid #ffd34d; border-radius: 8px; animation: pulse 1.6s infinite; }
+    .hl::after { content: ""; position: absolute; inset: -7px -10px; border: 3px solid #F2D58C; border-radius: 8px; animation: pulse 1.6s infinite; }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
-    .badge { position: absolute; width: 30px; height: 30px; border-radius: 50%; background: #ffd34d; color: #111; font-weight: 800; display: flex; align-items: center; justify-content: center; font-size: 15px; box-shadow: 0 3px 10px rgba(0,0,0,.4); }
+    .badge { position: absolute; width: 30px; height: 30px; border-radius: 50%; background: #F2D58C; color: var(--ink-950); font-family: var(--font-valor); font-weight: 600; display: flex; align-items: center; justify-content: center; font-size: 15px; box-shadow: 0 3px 10px rgba(0,0,0,.4); }
 
     /* Depois de instalar */
-    .after { background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--green); border-radius: 12px; padding: 16px 18px; font-size: 14.5px; }
-    .after b { color: #fff; }
+    .after { background: #fff; border: 1px solid var(--cream-200); border-left: 3px solid var(--green); border-radius: 12px; padding: 16px 18px; font-size: 14.5px; color: var(--ink-800); }
+    .after b { color: var(--ink-900); }
 
-    footer { margin-top: 50px; text-align: center; color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--border); padding-top: 18px; }
+    /* Rodape (igual ao do app) */
+    footer { margin-top: 50px; text-align: center; color: var(--ink-400); font-size: 11px; border-top: 1px solid var(--cream-200); padding-top: 18px; }
+    footer .foot-marca { display: flex; align-items: center; justify-content: center; gap: 8px; }
+    footer .foot-selo { display: inline-grid; place-items: center; height: 18px; padding: 0 7px; border-radius: 999px; border: 1px solid rgba(201,169,97,.70); background: var(--ink-950); color: var(--gold-300); font-size: 9px; font-weight: 600; letter-spacing: .18em; }
+    footer .foot-nome { font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--ink-800); }
+    footer .foot-linha { margin-top: 5px; letter-spacing: .12em; text-transform: uppercase; font-size: 10px; }
+    footer #footVer { text-transform: none; }
+    footer #footVer:not(:empty)::before { content: "\2022\00a0\00a0"; }
+
+    @media (max-width: 520px) {
+      .hero { padding: 36px 16px 96px; }
+      .brand svg { width: 42px; height: 42px; }
+      .dl-card { padding: 26px 16px 22px; }
+      .btn-dl, .btn-mac { width: 100%; }
+      h2 { font-size: 27px; margin-top: 38px; }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-
+  <div class="hero">
+    <div class="hero-rotulo">Acesso remoto</div>
     <div class="brand">
-      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-        <rect x="4" y="4" width="56" height="56" rx="14" fill="#6a4fe6"/>
-        <circle cx="24" cy="26" r="7" fill="#fff"/>
-        <circle cx="42" cy="40" r="7" fill="#cfc4ff"/>
-        <path d="M28.5 30.5 37.5 35.5" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+      <!-- Marca provisoria: anel dourado com a inicial (a mesma do app de computador), ate o icone novo ser escolhido. -->
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="32" cy="32" r="29" fill="none" stroke="#C9A961" stroke-width="2.5"/>
+        <text x="32" y="44" font-family="Cormorant Garamond, Georgia, serif" font-size="36" font-weight="600" fill="#DCC08A" text-anchor="middle">A</text>
       </svg>
       <h1>AeroDesk</h1>
     </div>
-    <p class="tagline">Acesso remoto simples, rapido e seguro.</p>
+    <p class="tagline">Acesso remoto simples, r&aacute;pido e seguro.</p>
+  </div>
+
+  <div class="wrap">
 
     <div class="dl-card">
       <div class="btn-row">
-        <a id="btnSetup" class="btn-dl" href="https://github.com/79237923/aerodesk-releases/releases/latest">&#11015;&#65039; Baixar para Windows</a>
+        <a id="btnSetup" class="btn-dl" href="https://github.com/79237923/aerodesk-releases/releases/latest"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg> Baixar para Windows</a>
         <a id="btnMac" class="btn-mac" href="https://github.com/79237923/aerodesk-releases/releases/latest"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.36 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.62-1.7-3.19-1.72-1.36-.14-2.65.8-3.34.8-.69 0-1.75-.78-2.87-.76-1.48.02-2.84.86-3.6 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.25 2.74 2.2 1.1-.04 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.08 2.65-2.14.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.3-.88-2.32-3.5zM14.2 5.98c.6-.74 1.01-1.75.9-2.77-.87.04-1.93.58-2.56 1.31-.56.65-1.05 1.69-.92 2.68.97.08 1.97-.49 2.58-1.22z"/></svg> Baixar para Mac</a>
       </div>
       <div id="dlMeta" class="dl-meta">Windows 10/11 &middot; instalador</div>
@@ -160,7 +202,10 @@
       e te mando a chave de ativa&ccedil;&atilde;o — voc&ecirc; cola uma &uacute;nica vez e est&aacute; pronto para usar.
     </div>
 
-    <footer>RRS Software &middot; Todos os direitos reservados &middot; <span id="footVer"></span></footer>
+    <footer>
+      <div class="foot-marca"><span class="foot-selo">RRS</span><span class="foot-nome">RRS Software</span></div>
+      <div class="foot-linha">Todos os direitos reservados <span id="footVer"></span></div>
+    </footer>
   </div>
 
   <script>

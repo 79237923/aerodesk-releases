@@ -6,43 +6,94 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#15171b">
+<meta name="theme-color" content="#1C1712">
 <meta name="apple-mobile-web-app-title" content="AeroDesk">
+<link rel="preload" href="../fonts/figtree-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../fonts/cormorant-garamond-500.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" type="image/png" href="icon.png">
 <title>AeroDesk — Celular</title>
 <style>
-  :root{ --bg:#15171b; --panel:#1e2128; --panel2:#262a32; --border:#323844; --text:#e7e9ee; --muted:#949aa5; --accent:#6a6fa6; --accent2:#868cc2; --green:#46d17a; --red:#e0625e; }
+  /* =====================================================================
+     PADRAO VISUAL HRF (o mesmo do app de computador e do Sistema HRF).
+     Fundo creme, barra escura "tinta", dourado como destaque.
+     Titulos: Cormorant Garamond · Texto: Figtree · Numeros e IDs: IBM Plex Serif.
+     As fontes sao servidas pelo PROPRIO site (pasta /fonts ao lado de /celular).
+     Se o arquivo faltar o texto cai calado na fonte do aparelho: nao da erro.
+     ===================================================================== */
+  @font-face{ font-family:"Cormorant Garamond"; font-style:normal; font-weight:500 700; font-display:swap; src:url("../fonts/cormorant-garamond-500.woff2") format("woff2"); }
+  @font-face{ font-family:"Figtree"; font-style:normal; font-weight:400 700; font-display:swap; src:url("../fonts/figtree-400.woff2") format("woff2"); }
+  @font-face{ font-family:"IBM Plex Serif"; font-style:normal; font-weight:500; font-display:swap; src:url("../fonts/ibm-plex-serif-500.woff2") format("woff2"); }
+  @font-face{ font-family:"IBM Plex Serif"; font-style:normal; font-weight:600; font-display:swap; src:url("../fonts/ibm-plex-serif-600.woff2") format("woff2"); }
+  :root{
+    --cream-50:#FAF8F4; --cream-100:#F4EFE6; --cream-200:#E8E0D0; --cream-300:#D9CDB6;
+    --ink-950:#1C1712; --ink-900:#262019; --ink-800:#3A322A; --ink-600:#6B6157; --ink-400:#9A9086;
+    --gold-300:#DCC08A; --gold-400:#C9A961; --gold-500:#B08D3E; --gold-600:#8F7130;
+    --font-display:"Cormorant Garamond",Georgia,serif;
+    --font-sans:"Figtree","Segoe UI",-apple-system,Roboto,Arial,sans-serif;
+    --font-valor:"IBM Plex Serif",Georgia,"Times New Roman",serif;
+    /* Nomes ANTIGOS: o codigo aplica alguns direto (var(--green), var(--red), var(--text), var(--muted)).
+       Continuam existindo, apontando para a paleta nova. */
+    --bg:var(--cream-50); --panel:#fff; --panel2:var(--cream-100); --border:var(--cream-200); --text:var(--ink-900); --muted:var(--ink-600); --accent:var(--gold-500); --accent2:var(--gold-600); --green:#047857; --red:#b91c1c;
+  }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html,body{ height:100%; margin:0; overscroll-behavior:none; background:var(--bg); color:var(--text); font-family:Segoe UI,-apple-system,Roboto,Arial,sans-serif; }
+  html,body{ height:100%; margin:0; overscroll-behavior:none; background:var(--bg); color:var(--text); font-family:var(--font-sans); -webkit-font-smoothing:antialiased; }
   body{ display:flex; flex-direction:column; }
+  button{ font-family:inherit; }
+  b,strong{ font-weight:600; }
   /* ---------- Tela de conexao ---------- */
-  #setup{ padding:18px 16px 30px; max-width:520px; margin:0 auto; width:100%; overflow:auto; }
-  .brand{ display:flex; align-items:center; gap:10px; font-weight:800; font-size:20px; margin:6px 0 2px; }
-  .brand .dot{ width:12px;height:12px;border-radius:50%;background:var(--accent2); box-shadow:0 0 0 4px rgba(134,140,194,.18); }
-  .sub{ color:var(--muted); font-size:13px; margin:0 0 16px; }
-  label{ display:block; font-size:12px; color:var(--muted); margin:14px 0 5px; }
-  input,select{ width:100%; padding:13px 12px; border-radius:11px; border:1px solid var(--border); background:#14161a; color:#fff; font-size:16px; }
-  input:focus,select:focus{ outline:none; border-color:var(--accent); }
-  .btn{ width:100%; margin-top:16px; padding:15px; border:0; border-radius:12px; background:var(--accent); color:#fff; font-size:16px; font-weight:700; cursor:pointer; }
-  .btn:active{ background:var(--accent2); }
-  .btn.sec{ background:var(--panel2); }
+  #setup{ width:100%; overflow:auto; }
+  /* Barra escura do topo (tambem cobre a area do relogio/entalhe quando instalado na tela inicial). */
+  .topo{ position:sticky; top:0; z-index:2; background:var(--ink-950); padding:calc(env(safe-area-inset-top) + 12px) max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left)); }
+  .topo-in{ display:flex; align-items:center; gap:10px; max-width:520px; margin:0 auto; }
+  .topo-in svg{ flex:0 0 auto; display:block; }
+  .topo-nome{ font-family:var(--font-display); font-size:25px; font-weight:600; line-height:1; color:var(--cream-50); letter-spacing:.2px; }
+  .topo-tag{ font-size:10px; font-weight:500; letter-spacing:.28em; text-transform:uppercase; color:var(--gold-400); margin-left:4px; padding-top:3px; }
+  .conteudo{ max-width:520px; margin:0 auto; padding:18px max(16px, env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 30px) max(16px, env(safe-area-inset-left)); }
+  .sub{ color:var(--muted); font-size:14px; line-height:1.5; margin:0 0 4px; }
+  /* Rotulo de secao (pequeno, dourado, espacado — o "Secao" do HRF). */
+  .rotulo, #favs:not(:empty)::before{ display:block; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.22em; color:var(--gold-600); margin:22px 0 10px; }
+  #favs:not(:empty)::before{ content:"PCs salvos"; }
+  .cartao{ background:#fff; border:1px solid var(--cream-200); border-radius:12px; padding:4px 16px 6px; }
+  label{ display:block; font-size:13px; font-weight:500; color:var(--ink-800); margin:14px 0 6px; }
+  /* Campos (16px de proposito: abaixo disso o iPhone da zoom sozinho ao tocar). */
+  #setup input,#setup select{ width:100%; min-height:48px; padding:12px 13px; border-radius:8px; border:1px solid var(--cream-300); background:#fff; color:var(--ink-900); font-family:inherit; font-size:16px; transition:border-color .15s, box-shadow .15s; }
+  #setup input{ -webkit-appearance:none; appearance:none; }
+  input:focus,select:focus,textarea:focus{ outline:none; }
+  #setup input:focus,#setup select:focus,#setup textarea:focus{ border-color:var(--gold-500); box-shadow:0 0 0 2px rgba(201,169,97,.40); }
+  #setup input::placeholder,#setup textarea::placeholder{ color:var(--ink-400); }
+  #setup #tid{ font-family:var(--font-valor); font-feature-settings:"tnum" 1; font-size:18px; font-weight:500; letter-spacing:.04em; }
+  #setup #tid::placeholder{ font-family:var(--font-sans); font-size:16px; font-weight:400; letter-spacing:0; }
+  .btn{ width:100%; margin-top:16px; min-height:50px; padding:13px 16px; border:1px solid transparent; border-radius:8px; background:var(--gold-500); color:#fff; font-size:16px; font-weight:600; cursor:pointer; transition:background .15s, border-color .15s, color .15s; }
+  .btn:active{ background:var(--gold-600); }
+  .btn.sec{ background:#fff; border-color:var(--cream-300); color:var(--ink-800); }
+  .btn.sec:active{ background:#fff; border-color:var(--gold-500); color:var(--gold-600); }
   .btn:disabled{ opacity:.5; }
   .row2{ display:flex; gap:10px; }
   .row2>*{ flex:1; }
-  .favs{ margin-top:18px; }
-  .fav{ display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:9px; }
+  .favs{ margin-top:4px; }
+  .fav{ display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--cream-200); border-radius:12px; padding:10px 8px 10px 16px; margin-bottom:10px; }
   .fav .fi{ flex:1; min-width:0; }
-  .fav .fn{ font-weight:700; font-size:15px; }
-  .fav .fd{ color:var(--muted); font-size:12px; font-family:monospace; }
-  .fav .go{ background:var(--accent); color:#fff; border:0; border-radius:9px; padding:9px 14px; font-weight:700; font-size:14px; }
-  .fav .del{ background:transparent; border:0; color:var(--muted); font-size:20px; padding:4px 6px; }
-  .err{ color:var(--red); font-size:13px; margin-top:10px; min-height:18px; }
-  .hint{ background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px 14px; font-size:13px; color:var(--muted); margin-top:14px; line-height:1.5; }
-  details{ margin-top:16px; border-top:1px solid var(--border); padding-top:6px; }
-  summary{ color:var(--muted); font-size:13px; padding:8px 0; cursor:pointer; }
-  textarea{ width:100%; height:80px; padding:10px; border-radius:10px; border:1px solid var(--border); background:#14161a; color:var(--accent2); font-family:monospace; font-size:11px; }
+  .fav .fn{ font-family:var(--font-display); font-variant-numeric:lining-nums; font-weight:600; font-size:21px; line-height:1.15; color:var(--ink-900); }
+  .fav .fd{ font-family:var(--font-valor); font-feature-settings:"tnum" 1; font-weight:600; font-size:13.5px; letter-spacing:.05em; color:var(--muted); margin-top:3px; }
+  .fav .go{ flex:0 0 auto; min-width:48px; min-height:44px; background:var(--gold-500); color:#fff; border:0; border-radius:8px; padding:9px 14px; font-weight:600; font-size:14px; }
+  .fav .go:active{ background:var(--gold-600); }
+  .fav .del{ flex:0 0 auto; min-width:44px; min-height:44px; background:transparent; border:0; border-radius:8px; color:var(--ink-400); font-size:22px; line-height:1; padding:4px 6px; }
+  .fav .del:active{ background:#fef2f2; color:var(--red); }
+  .err{ color:var(--red); font-size:13px; font-weight:500; margin-top:8px; min-height:18px; }
+  .hint{ background:#fff; border:1px solid var(--cream-200); border-left:3px solid var(--gold-400); border-radius:12px; padding:13px 15px; font-size:13.5px; color:var(--muted); margin-top:14px; line-height:1.55; }
+  #needLic{ background:rgba(201,169,97,.12); border-color:rgba(201,169,97,.55); color:var(--ink-800); }
+  details{ margin-top:22px; background:#fff; border:1px solid var(--cream-200); border-radius:12px; padding:0 16px; }
+  details[open]{ padding-bottom:16px; }
+  summary{ display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:50px; padding:7px 0; line-height:1.3; color:var(--ink-800); font-size:14px; font-weight:600; cursor:pointer; list-style:none; }
+  summary::-webkit-details-marker{ display:none; }
+  summary::after{ content:""; flex:0 0 auto; width:8px; height:8px; margin-right:4px; border-right:2px solid var(--gold-500); border-bottom:2px solid var(--gold-500); transform:rotate(45deg) translate(-2px,-2px); transition:transform .15s; }
+  details[open] summary{ border-bottom:1px solid var(--cream-200); }
+  details[open] summary::after{ transform:rotate(-135deg) translate(-2px,-2px); }
+  textarea{ width:100%; height:84px; padding:10px 12px; border-radius:8px; border:1px solid var(--cream-300); background:#fff; color:var(--ink-800); font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; line-height:1.45; transition:border-color .15s, box-shadow .15s; }
+  .rodape{ text-align:center; color:var(--ink-400); font-size:10px; letter-spacing:.12em; text-transform:uppercase; margin-top:22px; padding-top:16px; border-top:1px solid var(--cream-200); }
+  .rodape #cver{ text-transform:none; letter-spacing:.04em; }
   /* ---------- Tela do viewer ---------- */
   #viewer{ position:fixed; inset:0; background:#000; display:none; flex-direction:column; overflow:hidden; }
   #vp{ position:absolute; inset:0; transform-origin:0 0; touch-action:none; will-change:transform; } /* zoom/pan aplicados aqui */
@@ -51,15 +102,16 @@
   #topbar.hide{ opacity:0; pointer-events:none; }
   /* Aba para TRAZER A BARRA DE VOLTA (aparece so quando a barra esta escondida). */
   #showBar{ position:absolute; top:0; left:50%; transform:translateX(-50%); display:none; z-index:7;
-            background:#000000b3; border:0; color:#fff; font-size:13px; font-weight:700;
+            background:rgba(28,23,18,.82); border:0; color:var(--gold-300); font-size:13px; font-weight:700;
+            min-width:64px; min-height:44px;
             padding:calc(env(safe-area-inset-top) + 5px) 26px 7px; border-radius:0 0 12px 12px; }
   #showBar.on{ display:block; }
-  #showBar:active{ background:var(--accent); }
+  #showBar:active{ background:var(--gold-500); color:#fff; }
   #topbar .sp{ flex:1; }
-  .tb{ background:#ffffff1c; border:0; color:#fff; border-radius:9px; padding:9px 11px; font-size:14px; font-weight:600; }
-  .tb:active{ background:#ffffff33; }
-  .tb.act{ background:var(--accent); } /* teclado ABERTO (o botao fica aceso) */
-  .tb.red:active{ background:var(--red); }
+  .tb{ display:inline-flex; align-items:center; justify-content:center; text-align:center; min-width:44px; min-height:44px; background:rgba(28,23,18,.78); border:1px solid rgba(201,169,97,.42); color:var(--cream-50); border-radius:10px; padding:5px 10px; font-size:13px; line-height:1.15; font-weight:600; }
+  .tb:active{ background:rgba(58,50,42,.92); }
+  .tb.act{ background:var(--gold-500); border-color:var(--gold-400); color:#fff; } /* teclado ABERTO (o botao fica aceso) */
+  .tb.red:active{ background:var(--red); border-color:var(--red); }
   #reconnBadge{ position:absolute; top:10px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.82); color:#fff; padding:7px 15px; border-radius:18px; font-size:13px; display:none; z-index:8; pointer-events:none; }
   #idleWarn{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(20,14,0,.93); color:#ffcf70; border:1px solid #e8a33d; padding:14px 18px; border-radius:12px; font-size:14px; max-width:82vw; text-align:center; display:none; z-index:9; pointer-events:none; }
   #idleWarn.on{ display:block; }
@@ -74,11 +126,11 @@
     background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 20'%3E%3Cpath d='M0 0 L0 16 L4 12.5 L6.6 18.6 L9 17.6 L6.4 11.5 L12 11.5 Z' fill='white' stroke='black' stroke-width='1.4' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center/contain;
     filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.6)); }
   /* Barra de teclas especiais */
-  #keysbar{ position:absolute; left:0; right:0; bottom:0; display:none; gap:5px; padding:7px 6px calc(env(safe-area-inset-bottom) + 7px); background:#0d0f13ee; z-index:6; overflow-x:auto; }
+  #keysbar{ position:absolute; left:0; right:0; bottom:0; display:none; gap:5px; padding:7px 6px calc(env(safe-area-inset-bottom) + 7px); background:#1c1712f0; border-top:1px solid rgba(201,169,97,.30); z-index:6; overflow-x:auto; }
   #keysbar.on{ display:flex; }
-  .kb{ flex:0 0 auto; background:#262a32; border:1px solid var(--border); color:#e7e9ee; border-radius:8px; padding:11px 12px; font-size:14px; font-weight:600; }
-  .kb:active{ background:var(--accent); }
-  .kb.act{ background:var(--accent); }
+  .kb{ flex:0 0 auto; min-width:44px; min-height:44px; background:var(--ink-900); border:1px solid var(--ink-800); color:var(--cream-100); border-radius:8px; padding:10px 12px; font-size:14px; font-weight:600; }
+  .kb:active{ background:var(--gold-500); border-color:var(--gold-400); color:#fff; }
+  .kb.act{ background:var(--gold-500); border-color:var(--gold-400); color:#fff; }
   /* Campo invisivel que "ouve" o teclado do celular. NAO usar 1px fora da tela (left:-2000px):
      nessa condicao o Android/Gboard perde a posicao do cursor e passa a inserir cada letra NO
      INICIO -> a palavra chegava INVERTIDA no PC. Precisa ter tamanho REAL e ficar DENTRO da tela;
@@ -93,13 +145,26 @@
 
 <!-- ================= TELA DE CONEXAO ================= -->
 <div id="setup">
-  <div class="brand"><span class="dot"></span> AeroDesk <span style="font-size:13px;color:var(--muted);font-weight:600">no celular</span></div>
+  <header class="topo">
+    <div class="topo-in">
+      <!-- Marca provisoria: anel dourado com a inicial (a mesma do app de computador), ate o icone novo ser escolhido. -->
+      <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true">
+        <circle cx="32" cy="32" r="29" fill="none" stroke="#C9A961" stroke-width="2.5"/>
+        <text x="32" y="44" font-family="Cormorant Garamond, Georgia, serif" font-size="36" font-weight="600" fill="#DCC08A" text-anchor="middle">A</text>
+      </svg>
+      <span class="topo-nome">AeroDesk</span>
+      <span class="topo-tag">no celular</span>
+    </div>
+  </header>
+  <div class="conteudo">
   <p class="sub">Acesse seus PCs de qualquer lugar. Digite o ID do PC e a senha.</p>
 
   <div id="needLic" class="hint" style="display:none">
     <b style="color:var(--text)">Primeiro acesso:</b> cole sua <b>chave de assinatura</b> em “Configurações” (embaixo) uma vez. Depois é só conectar.
   </div>
 
+  <div class="rotulo">Conectar</div>
+  <div class="cartao">
   <label>ID do PC</label>
   <input id="tid" inputmode="numeric" autocomplete="off" placeholder="ex: 386 386 665">
   <label>Senha do PC</label>
@@ -109,6 +174,7 @@
     <button class="btn sec" id="btnSaveFav" style="flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px">☆ Salvar</button>
   </div>
   <div class="err" id="err"></div>
+  </div>
 
   <div class="favs" id="favs"></div>
 
@@ -137,7 +203,8 @@
   <div class="hint" style="margin-top:20px">
     <b style="color:var(--text)">Controle estilo touchpad:</b> arraste o dedo <b>= move o cursor</b> · toque <b>= clique</b> · segurar (ou 2 dedos) <b>= clique direito</b> · <b>pinça = zoom</b> (aproximar/afastar) · com zoom, 2 dedos <b>= mover a tela</b>; sem zoom, 2 dedos <b>= rolar</b> · toque-duplo e arraste <b>= arrastar</b>. Botão <b>⌨</b> = teclado.
   </div>
-  <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:16px;">AeroDesk · celular · <span id="cver"></span></div>
+  <div class="rodape">AeroDesk · celular · <span id="cver"></span></div>
+  </div>
 </div>
 
 <!-- ================= TELA DO VIEWER ================= -->
@@ -987,12 +1054,16 @@ if(typeof VideoDecoder==='undefined'){
 // ---------- auto-atualizacao (sem cache velho, sem ?v=) ----------
 // Compara a versao carregada com o ver.txt do servidor; se mudou, recarrega — mas SO fora de
 // uma sessao (nunca no meio de um acesso). Assim o app pega a versao nova sozinho ao abrir/voltar.
-var CELVER='24';
+var CELVER='26';
 try{ $('cver').textContent='v'+CELVER; }catch(e){}
+function formularioEmEdicao(){
+  var el=document.activeElement;
+  return !!(el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+}
 function checkVer(){
-  if(connected || reconectando || pc || ws) return;
+  if(connected || reconectando || pc || ws || formularioEmEdicao()) return;
   fetch('ver.txt?cb='+Date.now(),{cache:'no-store'}).then(function(r){return r.text();}).then(function(t){
-    if(connected || reconectando || pc || ws) return; // inclui a negociacao antes de abrir o canal
+    if(connected || reconectando || pc || ws || formularioEmEdicao()) return; // inclui foco adquirido durante a consulta
     t=(t||'').trim(); if(t && t!==CELVER){ try{location.reload(true);}catch(e){location.reload();} }
   }).catch(function(){});
 }
